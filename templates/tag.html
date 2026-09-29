@@ -1,0 +1,18 @@
+  <main id="content" class="page">
+    <div class="page-inner">
+      <header class="page-header">
+        <p class="eyebrow">Tag</p>
+        <h1 style="color:{{ colour }}">#{{ tag }}</h1>
+        <p>{{ count_label }}</p>
+        <div class="note-actions">
+          <a class="btn" href="{{ base }}?view=list">All notes</a>
+          <a class="btn" href="{{ base }}?tag={{ tag }}">Show in 3D</a>
+        </div>
+      </header>
+
+      <div class="tag-notes">
+{{ items }}
+      </div>
+      {{ more }}
+    </div>
+  </main>

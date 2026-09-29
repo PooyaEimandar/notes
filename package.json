@@ -1,0 +1,16 @@
+{
+  "name": "pooya-notes",
+  "version": "1.0.0",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=22.18.0"
+  },
+  "scripts": {
+    "check": "tsc --project web/tsconfig.json --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "5.9.2"
+  }
+}

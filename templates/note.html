@@ -1,0 +1,39 @@
+  <main id="content" class="page">
+    <article class="page-inner" lang="{{ lang }}"{{ direction }} data-pagefind-body
+      data-pagefind-sort="date:{{ iso_date }}">
+      <header class="page-header">
+        <div class="note-bar" data-pagefind-ignore>
+          <p class="eyebrow"><time datetime="{{ iso_date }}">{{ long_date }}</time></p>
+          <div class="note-share">
+            <button class="btn" type="button" data-share="{{ canonical }}" data-title="{{ title }}" aria-live="polite"
+              hidden>Share</button>
+            <a class="btn" href="{{ base }}feed.xml">Feed</a>
+          </div>
+        </div>
+        <h1 data-pagefind-meta="title">{{ title }}</h1>
+        <ul class="page-meta" data-pagefind-ignore>
+        {{ meta }}
+        </ul>
+      </header>
+
+      <div class="prose">
+{{ content }}
+      </div>
+
+      <footer class="note-footer" data-pagefind-ignore>
+        <p class="note-history"><span class="note-history-tags">{{ footer_tags }}</span><span>View the revision history <a href="{{ history }}" target="_blank"
+              rel="noopener noreferrer">here</a>.</span></p>
+        <div class="note-bar">
+          <div class="note-actions">
+            <a class="btn" href="{{ base }}?view=list">All notes</a>
+            <a class="btn" href="{{ base }}?note={{ id }}">Locate in 3D</a>
+          </div>
+          <div class="note-share">
+            <button class="btn" type="button" data-share="{{ canonical }}" data-title="{{ title }}" aria-live="polite"
+              hidden>Share</button>
+            <a class="btn" href="{{ base }}feed.xml">Feed</a>
+          </div>
+        </div>
+{{ neighbours }}      </footer>
+    </article>
+  </main>

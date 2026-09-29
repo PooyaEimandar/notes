@@ -1,0 +1,11 @@
+**/.DS_Store
+
+# Local build and dependency output
+/_site/
+/target/
+/node_modules/
+/.venv/
+/.cache/
+
+**/__pycache__/
+*.py[cod]

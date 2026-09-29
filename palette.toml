@@ -1,0 +1,57 @@
+# Tag colours. A note's orb, and every "#tag" label, takes the colour of the tag.
+# The orb uses the note's first tag.
+#
+# Language colours are GitHub's own, from github-linguist/linguist
+# (lib/linguist/languages.yml). Topic colours are not defined by GitHub; edit
+# them freely.
+
+# Used for any tag that is not listed below.
+default = "#56e8ff"
+
+# Colours darker than this lightness (0..1) are lifted to it before display so
+# they stay visible on the black background. The values below are not changed.
+min_lightness = 0.6
+
+[tags]
+# Languages (GitHub linguist)
+rust = "#dea584"
+cpp = "#f34b7d"
+c = "#555555"
+csharp = "#7355dd"
+python = "#3572A5"
+typescript = "#3178c6"
+javascript = "#f1e05a"
+go = "#00ADD8"
+zig = "#ec915c"
+swift = "#F05138"
+kotlin = "#A97BFF"
+java = "#b07219"
+lua = "#000080"
+shell = "#89e051"
+assembly = "#6E4C13"
+glsl = "#5686a5"
+hlsl = "#aace60"
+wgsl = "#1a5e9a"
+metal = "#8f14e9"
+html = "#e34c26"
+css = "#663399"
+sql = "#e38c00"
+cmake = "#DA3434"
+nix = "#7e7eff"
+webassembly = "#04133b"
+
+# Topics
+personal = "#56e8ff"
+technology = "#3178c6"
+graphics = "#5686a5"
+webgpu = "#1a5e9a"
+gpu = "#00ff84"
+networking = "#00ADD8"
+system = "#555555"
+ai = "#3572A5"
+leadership = "#f1e05a"
+business = "#89e051"
+project = "#dea584"
+politic = "#e34c26"
+game = "#A97BFF"
+movie = "#f34b7d"

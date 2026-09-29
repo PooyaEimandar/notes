@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "notes",
+      "runtimeExecutable": ".venv/bin/python",
+      "runtimeArgs": ["build.py", "serve", "--port", "8000"],
+      "port": 8000
+    }
+  ]
+}

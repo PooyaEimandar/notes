@@ -1,0 +1,55 @@
+# Site settings read by build.py.
+
+title = "Pooya's Notes"
+description = "Notes by Pooya Eimandar"
+author = "Pooya Eimandar"
+email = "mail@pooya.ai"
+wordmark = "Stay Hungry, Stay Foolish"
+
+# The site is served from https://pooya.ai/notes/ by GitHub Pages.
+origin = "https://pooya.ai"
+base_path = "/notes/"
+
+# Used for the "revision history" link on every note.
+repository = "https://github.com/PooyaEimandar/notes"
+branch = "main"
+
+social_image = "https://github.com/PooyaEimandar.png?size=512"
+same_as = [
+  "https://github.com/PooyaEimandar",
+  "https://www.youtube.com/channel/UC5XZoDB5YHd07WSWeMAYyZQ",
+]
+
+# Notes per lazily loaded chunk of the timeline, and notes in the Atom feed.
+chunk_size = 64
+feed_size = 30
+# Tags shown in the filter bar, most used first.
+tag_bar_size = 24
+
+[[nav]]
+label = "Home"
+href = "/"
+
+[[nav]]
+label = "Timeline"
+href = "/timeline/"
+
+[[nav]]
+label = "Notes"
+href = "/notes/"
+
+[[nav]]
+label = "GitHub"
+href = "https://github.com/PooyaEimandar"
+
+[[nav]]
+label = "YouTube"
+href = "https://www.youtube.com/channel/UC5XZoDB5YHd07WSWeMAYyZQ"
+
+[[nav]]
+label = "Sponsor"
+href = "https://github.com/sponsors/PooyaEimandar"
+
+[[nav]]
+label = "Contact"
+href = "mailto:mail@pooya.ai"
