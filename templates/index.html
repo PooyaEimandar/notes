@@ -1,33 +1,34 @@
-  <main id="content">
-    <h1 class="visually-hidden">{{ title }}</h1>
+<main id="content">
+  <h1 class="visually-hidden">{{ title }}</h1>
 
-    <section class="toolbar" aria-label="Search and filters">
-      <form class="search" id="search" role="search" action="{{ base }}" method="get">
-        <label class="search-prompt" for="search-input" aria-hidden="true">$ grep</label>
-        <input id="search-input" name="q" type="search" placeholder="Search" autocomplete="off" spellcheck="false"
-          aria-label="Search all notes">
-        <span class="search-status" id="search-status" aria-live="polite"></span>
-        <button class="btn" id="view-switch" type="button" hidden>Show list</button>
-      </form>
-      <nav class="tag-bar" id="tag-bar" aria-label="Filter by tag">
-{{ tag_bar }}
-      </nav>
-    </section>
+  <section class="toolbar" aria-label="Search and filters">
+    <form class="search" id="search" role="search" action="{{ base }}" method="get">
+      <label class="search-prompt" for="search-input" aria-hidden="true">$ grep</label>
+      <input id="search-input" name="q" type="search" placeholder="Search" autocomplete="off" spellcheck="false"
+        aria-label="Search all notes">
+      <span class="search-status" id="search-status" aria-live="polite"></span>
+      <button class="btn" id="view-switch" type="button" hidden>Show list</button>
+    </form>
+    <nav class="tag-bar" id="tag-bar" aria-label="Filter by tag">
+      {{ tag_bar }}
+    </nav>
+  </section>
 
-    <div class="scene" id="scene" aria-hidden="true">
-      <div class="scene-scan"></div>
-      <div class="scene-labels" id="scene-labels"></div>
-    </div>
+  <div class="scene" id="scene" aria-hidden="true">
+    <div class="scene-scan"></div>
+    <p class="scene-status">Loading...</p>
+    <div class="scene-labels" id="scene-labels"></div>
+  </div>
 
-    <aside class="preview" id="preview" aria-live="polite" hidden></aside>
+  <aside class="preview" id="preview" aria-live="polite" hidden></aside>
 
-    <section class="timeline" id="timeline" aria-label="All notes">
-      <div class="timeline-inner">
-        <p class="list-summary" id="list-summary" data-count="{{ count }}">{{ count_label }}</p>
-        <div id="list-items">
-{{ items }}
-        </div>
-        <div class="list-more" id="list-more" aria-live="polite"></div>
+  <section class="timeline" id="timeline" aria-label="All notes">
+    <div class="timeline-inner">
+      <p class="list-summary" id="list-summary" data-count="{{ count }}">{{ count_label }}</p>
+      <div id="list-items">
+        {{ items }}
       </div>
-    </section>
-  </main>
+      <div class="list-more" id="list-more" aria-live="polite"></div>
+    </div>
+  </section>
+</main>

@@ -357,7 +357,11 @@ a:hover {
   top: 0;
   left: 0;
   padding: 0.2rem 0.45rem;
+  border: 0;
   border-left: 2px solid var(--tag, var(--accent));
+  border-radius: 0;
+  pointer-events: auto;
+  cursor: pointer;
   color: var(--ink);
   background: rgba(1, 3, 4, 0.85);
   font: 600 0.69rem/1.4 var(--mono);
@@ -370,7 +374,8 @@ a:hover {
   content: "> ";
 }
 
-.scene-label.is-active {
+.scene-label.is-active,
+.scene-label:hover {
   color: #fff;
 }
 
@@ -542,24 +547,31 @@ a:hover {
   font: 400 0.75rem/1.6 var(--mono);
 }
 
-/* View modes. Without JavaScript or WebGPU the page stays in list mode. */
+/* View modes. Without JavaScript or WebGPU the page stays in list mode.
+   "waiting-for-scene" is set before the first frame when the browser has
+   WebGPU, so the page opens on the scene and the list never flashes by. */
 
-body.view-3d {
+body.view-3d,
+.waiting-for-scene body {
   height: 100dvh;
   overflow: hidden;
   overscroll-behavior: none;
 }
 
-body.view-3d .scene {
+body.view-3d .scene,
+.waiting-for-scene .scene {
   visibility: visible;
 }
 
-body.view-3d .toolbar {
+body.view-3d .toolbar,
+.waiting-for-scene .toolbar {
   background: rgba(1, 3, 4, 0.82);
 }
 
 body.view-3d .timeline,
-body.view-3d .site-footer {
+body.view-3d .site-footer,
+.waiting-for-scene .timeline,
+.waiting-for-scene .site-footer {
   position: absolute !important;
   width: 1px !important;
   height: 1px !important;
@@ -571,6 +583,26 @@ body.view-3d .site-footer {
   clip-path: inset(50%) !important;
   border: 0 !important;
   white-space: nowrap !important;
+}
+
+.scene-status {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  display: none;
+  margin: 0;
+  color: var(--ink-muted);
+  font: 400 0.78rem/1.6 var(--mono);
+  transform: translate(-50%, -50%);
+}
+
+.scene-status::before {
+  color: var(--accent);
+  content: "> ";
+}
+
+.waiting-for-scene .scene-status {
+  display: block;
 }
 
 body:not(.view-3d) .preview {

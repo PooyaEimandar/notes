@@ -46,6 +46,17 @@ RTL_LANGUAGES = {"ar", "fa", "he", "ur"}
 NO_TAG = 0xFFFF
 MAX_TAGS_PER_NOTE = 5
 MAX_BRIDGES = 200
+# Runs before the page is drawn. With WebGPU the list is hidden from the first
+# frame, so the scene is the first thing a visitor sees. Without it, or when
+# the address asks for the list, the list shows as usual.
+WAIT_FOR_SCENE = """<script>
+    (function () {
+      var asked = new URLSearchParams(location.search);
+      if (navigator.gpu && (asked.get("view") !== "list" || asked.has("note"))) {
+        document.documentElement.classList.add("waiting-for-scene");
+      }
+    })();
+  </script>"""
 
 
 class BuildError(Exception):
@@ -690,7 +701,8 @@ def build_index(site: Site, notes: list[Note], tags: list[dict[str, object]]) ->
     }
     scripts = f'<script type="module" src="{site.base}assets/js/app.js?v={site.build_id}"></script>'
     site.page(path="", title=str(config["title"]), description=str(config["description"]), body=body,
-              body_class="page-index view-list", og_type="website", json_ld=json_ld, scripts=scripts)
+              body_class="page-index view-list", og_type="website", json_ld=json_ld, scripts=scripts,
+              head_extra=WAIT_FOR_SCENE)
 
 
 def build_notes(site: Site, notes: list[Note]) -> None:

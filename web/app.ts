@@ -59,6 +59,8 @@ const MONTHS = ["January", "February", "March", "April", "May", "June", "July", 
 const LIST_BATCH = 20;
 const SEARCH_DELAY_MS = 180;
 const SCENE_TIMEOUT_MS = 15000;
+/** Set on <html> by the script in the page's head; see build.py. */
+const WAITING_FOR_SCENE = "waiting-for-scene";
 const LABEL_STRIDE = 5;
 const NO_TAG = 0xffff;
 const TAGS_PER_NOTE = 5;
@@ -102,7 +104,6 @@ const activeTags = new Set<number>();
 let matches: Uint32Array | null = null;
 let excerpts = new Map<number, SearchResult>();
 let selected = -1;
-let userHasActed = false;
 
 // ------------------------------------------------------------------- data
 
@@ -612,8 +613,12 @@ function labelFor(id: number): HTMLElement | null {
     void loadNote(id).catch(() => undefined);
     return null;
   }
-  const label = document.createElement("div");
+  // A button, so the label can be clicked like the orb it names.
+  const label = document.createElement("button");
+  label.type = "button";
   label.className = "scene-label";
+  label.dataset.note = String(id);
+  label.tabIndex = -1;
   label.textContent = note.title;
   const first = note.tags[0];
   label.style.setProperty("--tag", (first !== undefined && first !== NO_TAG ? manifest.tags[first]?.color : undefined)
@@ -660,7 +665,11 @@ function placeLabels(): void {
       if (left + labelWidth > width - 8) {
         left = x - radius - 16 - labelWidth;
       }
-      const box = new DOMRect(left, y - 12 - LABEL_HEIGHT / 2, labelWidth, LABEL_HEIGHT);
+      let box = new DOMRect(left, y - 12 - LABEL_HEIGHT / 2, labelWidth, LABEL_HEIGHT);
+      if (panel !== null && overlaps(box, panel)) {
+        // The preview is in the way; try the other side of the orb.
+        box = new DOMRect(x - radius - 16 - labelWidth, box.top, labelWidth, LABEL_HEIGHT);
+      }
       if (box.top < top + 4 || box.left < 4) {
         continue;
       }
@@ -716,6 +725,8 @@ async function hasWebGpu(): Promise<boolean> {
 
 async function startScene(): Promise<SceneBindings> {
   const ready = waitForEvent("notes:ready", SCENE_TIMEOUT_MS);
+  // If loading fails first, nobody waits for this promise any more.
+  ready.catch(() => undefined);
   const [bindings, bytes] = await Promise.all([
     import(`${base}pkg/pooya_notes.js?v=${build}`) as Promise<SceneBindings>,
     fetchBytes("data/scene.bin"),
@@ -731,6 +742,8 @@ function setView(next: View): void {
   if (next === "3d" && !scene) {
     next = "list";
   }
+  // The page no longer waits for the scene.
+  root.classList.remove(WAITING_FOR_SCENE);
   view = next;
   document.body.classList.toggle("view-3d", view === "3d");
   document.body.classList.toggle("view-list", view === "list");
@@ -781,6 +794,13 @@ function listen(): void {
     }
   });
 
+  labelLayer.addEventListener("click", (event) => {
+    const label = (event.target as HTMLElement).closest<HTMLElement>("[data-note]");
+    if (label && scene) {
+      scene.select(Number(label.dataset.note));
+    }
+  });
+
   viewSwitch.addEventListener("click", () => {
     setView(view === "3d" ? "list" : "3d");
   });
@@ -793,13 +813,6 @@ function listen(): void {
     }
   });
 
-  // Only real input counts; the browser also scrolls by itself, for example
-  // when it restores a position.
-  for (const name of ["pointerdown", "keydown", "wheel", "touchstart"]) {
-    window.addEventListener(name, () => {
-      userHasActed = true;
-    }, { once: true, passive: true });
-  }
   window.addEventListener("scroll", () => {
     if (view === "list" && nearEndOfList()) {
       void renderMore();
@@ -837,6 +850,18 @@ function listen(): void {
 }
 
 async function start(): Promise<void> {
+  // The page opens on the scene. A script in the head has already hidden the
+  // list if this browser has WebGPU, so the list never flashes by first. The
+  // scene starts loading at once, alongside everything else.
+  const waiting = root.classList.contains(WAITING_FOR_SCENE);
+  const starting: Promise<SceneBindings | null> = hasWebGpu()
+    .then((supported) => (supported ? startScene() : null))
+    .catch((error) => {
+      console.error(error);
+      sceneMount.querySelector("canvas")?.remove();
+      return null;
+    });
+
   adoptPrerenderedList();
   listen();
   manifest = await fetchJson<Manifest>("data/manifest.json");
@@ -856,16 +881,10 @@ async function start(): Promise<void> {
     await applyFilters();
   }
 
-  if (!(await hasWebGpu())) {
-    return;
-  }
-  searchStatus.textContent = "Loading 3D…";
-  try {
-    scene = await startScene();
-  } catch (error) {
-    console.error(error);
-    sceneMount.querySelector("canvas")?.remove();
-    showStatus();
+  scene = await starting;
+  if (!scene) {
+    // No WebGPU, or the scene failed to start: the list is the site.
+    setView("list");
     return;
   }
   if (matches) {
@@ -878,10 +897,9 @@ async function start(): Promise<void> {
   }
   requestAnimationFrame(placeLabels);
 
-  // The scene is the default view, unless the address asks for the list or
-  // the visitor has already started using it.
+  // The scene is the default view, unless the address asks for the list.
   const locating = Number.isInteger(wantedNote) && wantedNote >= 0 && wantedNote < manifest.count;
-  if (locating || (!wantsList && !userHasActed)) {
+  if (locating || (waiting && !wantsList)) {
     setView("3d");
     if (locating) {
       scene.select(wantedNote);
@@ -891,4 +909,7 @@ async function start(): Promise<void> {
   }
 }
 
-start().catch((error) => console.error(error));
+start().catch((error) => {
+  console.error(error);
+  root.classList.remove(WAITING_FOR_SCENE);
+});
