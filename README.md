@@ -78,17 +78,8 @@ repository settings, Pages has to use "GitHub Actions" as its source.
 
 ## License
 
-Copyright (c) 2026 Pooya Eimandar.
-
 | Material                                    | Terms                 |
 | ------------------------------------------- | --------------------- |
-| Source code, software, and shaders          | [MIT](LICENSE-MIT)    |
-| Code samples inside the articles            | [MIT](LICENSE-MIT)    |
-| Articles, including the notes in `content/` | [All rights reserved](content/LICENSE) |
+| Source code, samples, and shaders           | [MIT](LICENSE-MIT)    |
+| Articles and notes                          | [All rights reserved](content/LICENSE) |
 
-The articles may not be copied, republished, translated, or adapted without
-written permission. To ask for permission, write to <mail@pooya.ai>.
-
-Logos, trademarks, portraits, and other visual branding are also all rights
-reserved. Third-party code, content, fonts, and other assets remain subject to
-their original licenses.
