@@ -1,6 +1,6 @@
 # Notes
 
-Pooya Eimandar's notes, published at <https://pooya.ai/notes/>.
+[Pooya Eimandar's notes](https://pooya.ai/notes/).
 
 ## Writing a note
 
