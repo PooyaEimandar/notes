@@ -7,7 +7,9 @@ use std::cell::RefCell;
 
 use sib::render::glam::{Vec2, Vec3};
 use sib::render::winit::dpi::PhysicalSize;
-use sib::render::winit::event::{ElementState, MouseButton, MouseScrollDelta, TouchPhase, WindowEvent};
+use sib::render::winit::event::{
+    ElementState, MouseButton, MouseScrollDelta, TouchPhase, WindowEvent,
+};
 use sib::render::{Example, ExampleSettings, FrameStats, RenderContext, RenderResult, wgpu};
 
 use crate::bridge;
@@ -22,6 +24,11 @@ const INTRO_SECONDS: f32 = 1.8;
 const LABELS: usize = 12;
 const LABELS_WHEN_FILTERING: usize = 32;
 const NEVER: f32 = -1.0e6;
+/// The shaders' clock wraps at this many seconds, so an f32 still resolves
+/// single frames however long the page stays open. Every animation in
+/// `scene.wgsl` repeats a whole number of times in this span, so nothing jumps
+/// when the clock wraps.
+const CLOCK_WRAP: f64 = 3600.0;
 /// Links are drawn within this distance of the camera.
 const LINK_RANGE: f32 = 90.0;
 /// With more notes than this, distant orbs are dimmed and drawn smaller.
@@ -80,6 +87,13 @@ impl Random {
     }
 }
 
+/// Rounds a speed in turns per second to one that completes a whole number of
+/// turns before the shader clock wraps.
+fn whole_turns(speed: f32) -> f32 {
+    let wrap = CLOCK_WRAP as f32;
+    (speed * wrap).round().max(1.0) / wrap
+}
+
 #[derive(Default)]
 struct Pointer {
     cursor: Option<Vec2>,
@@ -104,7 +118,9 @@ pub struct Notes {
     instances_changed: bool,
     orbit: Orbit,
     stats: FrameStats,
-    seconds: f32,
+    /// Seconds since launch. An f32 here would stop resolving single frames
+    /// after a few hours and stop advancing altogether after a few days.
+    clock: f64,
     intro: f32,
     reduced_motion: bool,
     paused: bool,
@@ -127,7 +143,7 @@ impl Default for Notes {
             instances_changed: false,
             orbit: Orbit::default(),
             stats: FrameStats::new(),
-            seconds: 0.0,
+            clock: 0.0,
             intro: 0.0,
             reduced_motion: false,
             paused: false,
@@ -174,11 +190,12 @@ impl Notes {
             self.scene.radius * size.y / free.y,
             free.x / free.y,
         );
-        self.orbit.set_offset(Vec2::new(
-            (left - right) / size.x,
-            (bottom - top) / size.y,
-        ));
-        match self.selected.and_then(|id| self.scene.positions.get(id as usize)) {
+        self.orbit
+            .set_offset(Vec2::new((left - right) / size.x, (bottom - top) / size.y));
+        match self
+            .selected
+            .and_then(|id| self.scene.positions.get(id as usize))
+        {
             Some(position) => self.orbit.focus(*position),
             None => self.orbit.show_everything(),
         }
@@ -234,6 +251,7 @@ impl Notes {
 
     fn set_matches(&mut self, matches: Option<Vec<u32>>) {
         self.filtering = matches.is_some();
+        let flash_at = self.shader_seconds();
         match matches {
             None => self.lit.fill(true),
             Some(ids) => {
@@ -241,7 +259,7 @@ impl Notes {
                 for id in ids {
                     if let Some(lit) = self.lit.get_mut(id as usize) {
                         *lit = true;
-                        self.flash_at[id as usize] = self.seconds;
+                        self.flash_at[id as usize] = flash_at;
                     }
                 }
             }
@@ -322,7 +340,12 @@ impl Notes {
                 Instance {
                     a: [from.x, from.y, from.z, random.next()],
                     b: [to.x, to.y, to.z, if link.explicit { 1.8 } else { 1.0 }],
-                    c: [if lit { 1.0 } else { 0.0 }, random.between(0.15, 0.4), 0.0, 0.0],
+                    c: [
+                        if lit { 1.0 } else { 0.0 },
+                        whole_turns(random.between(0.15, 0.4)),
+                        0.0,
+                        0.0,
+                    ],
                 }
             })
             .collect();
@@ -354,6 +377,11 @@ impl Notes {
             }
         }
         best.map(|(id, _)| id)
+    }
+
+    /// The clock the shaders see, which wraps at `CLOCK_WRAP`.
+    fn shader_seconds(&self) -> f32 {
+        (self.clock % CLOCK_WRAP) as f32
     }
 
     fn eased_intro(&self) -> f32 {
@@ -616,7 +644,15 @@ impl Example for Notes {
         if self.paused {
             return;
         }
-        self.seconds += elapsed;
+        let before = self.shader_seconds();
+        self.clock += f64::from(elapsed);
+        if self.shader_seconds() < before {
+            // The shader clock has wrapped. A flash is timed on that clock, so
+            // an old one would otherwise fire again when the clock next
+            // passes its start.
+            self.flash_at.fill(NEVER);
+            self.instances_changed = true;
+        }
         if !self.scene.positions.is_empty() {
             self.intro = (self.intro + elapsed / INTRO_SECONDS).min(1.0);
         }
@@ -641,7 +677,7 @@ impl Example for Notes {
             view_projection: view.view_projection.to_cols_array_2d(),
             viewport: [view.size.x, view.size.y, view.offset.x, view.offset.y],
             time: [
-                self.seconds,
+                self.shader_seconds(),
                 self.eased_intro(),
                 if self.reduced_motion { 0.0 } else { 1.0 },
                 if self.srgb { 1.0 } else { 0.0 },
@@ -698,8 +734,45 @@ impl Example for Notes {
             a: 1.0,
         };
         if let Some(gpu) = &self.gpu {
-            gpu.draw(view, encoder, clear, self.paused || self.scene.positions.is_empty());
+            gpu.draw(
+                view,
+                encoder,
+                clear,
+                self.paused || self.scene.positions.is_empty(),
+            );
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_link_pulse_is_back_at_its_start_when_the_clock_wraps() {
+        for speed in [0.15_f32, 0.2371, 0.4] {
+            let turns = whole_turns(speed) * CLOCK_WRAP as f32;
+            assert!(
+                (turns - turns.round()).abs() < 1.0e-3,
+                "{speed} gives {turns} turns"
+            );
+            assert!((whole_turns(speed) - speed).abs() < 1.0 / CLOCK_WRAP as f32);
+        }
+    }
+
+    #[test]
+    fn the_shader_clock_wraps_but_keeps_its_precision() {
+        let mut notes = Notes {
+            clock: CLOCK_WRAP * 100.0 + 12.5,
+            ..Notes::default()
+        };
+        assert!((notes.shader_seconds() - 12.5).abs() < 1.0e-3);
+
+        // Ten days in, one frame at 120 Hz still moves the clock.
+        notes.clock = 864_000.0;
+        let before = notes.shader_seconds();
+        notes.clock += 1.0 / 120.0;
+        assert!(notes.shader_seconds() > before);
     }
 }

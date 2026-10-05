@@ -29,7 +29,7 @@ The note, in Markdown.
 | `summary` | no       | Defaults to the first paragraph.                                     |
 | `updated` | no       | The day it was revised. Defaults to the date of its last git commit. |
 | `slug`    | no       | The address of the note. Defaults to the file name.                  |
-| `lang`    | no       | The language, such as `fa`. Defaults to `en`.                        |
+| `lang`    | no       | The language, such as `fa`. Worked out from the tags and the text. Defaults to `en`   |
 | `draft`   | no       | `true` keeps the note out of the site.                               |
 
 A note that needs images can be a folder: `content/2026/my-note/index.md`, with
@@ -50,7 +50,7 @@ python3 -m venv .venv
 .venv/bin/pip install -r requirements.txt
 npm ci
 rustup target add wasm32-unknown-unknown
-cargo install wasm-bindgen-cli --version 0.2.127 --locked
+cargo install wasm-bindgen-cli --version 0.2.129 --locked
 ```
 
 Then:

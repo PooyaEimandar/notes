@@ -124,7 +124,9 @@ impl SceneData {
             let to = reader.u32()?;
             let kind = reader.u32()?;
             if from as usize >= note_count || to as usize >= note_count {
-                return Err(format!("a link joins notes {from} and {to}, but there are {note_count} notes"));
+                return Err(format!(
+                    "a link joins notes {from} and {to}, but there are {note_count} notes"
+                ));
             }
             links.push(Link {
                 from,
@@ -177,7 +179,10 @@ mod tests {
         assert_eq!(scene.centroid, Vec3::new(1.0, 2.0, 3.0));
         assert_eq!(scene.radius, 9.0);
         assert_eq!(scene.floor, -4.0);
-        assert_eq!(scene.positions, vec![Vec3::new(0.0, 1.0, 2.0), Vec3::new(3.0, 4.0, 5.0)]);
+        assert_eq!(
+            scene.positions,
+            vec![Vec3::new(0.0, 1.0, 2.0), Vec3::new(3.0, 4.0, 5.0)]
+        );
         assert_eq!(scene.colors, vec![[1.0, 0.0, 0.0], [0.0, 1.0, 0.0]]);
         assert_eq!(
             scene.links,

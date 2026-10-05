@@ -53,3 +53,8 @@ href = "https://github.com/sponsors/PooyaEimandar"
 [[nav]]
 label = "Contact"
 href = "mailto:mail@pooya.ai"
+
+# A note with one of these tags is in that language, so it needs no "lang" line
+# of its own. Persian is laid out right to left.
+[language_tags]
+"پارسی" = "fa"

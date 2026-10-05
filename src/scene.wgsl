@@ -21,6 +21,12 @@ struct Globals {
 
 @group(0) @binding(0) var<uniform> g: Globals;
 
+// The clock in `time.x` wraps every 3600 seconds (CLOCK_WRAP in app.rs). These
+// turn a whole number of times in that span, so nothing jumps when it wraps.
+const CLOCK_WRAP: f32 = 3600.0;
+const ORB_PULSE: f32 = 6.283185307 * 1261.0 / 3600.0;
+const STAR_TWINKLE: f32 = 6.283185307 * 859.0 / 3600.0;
+
 const STATE_DIM: f32 = 0.0;
 const STATE_LIT: f32 = 1.0;
 const STATE_STAR: f32 = 2.0;
@@ -72,13 +78,17 @@ fn vs_orb(
     var smallest = g.detail.z;
 
     if (state > 1.5) {
-        brightness = 0.3 + 0.25 * sin(seconds * 1.5 * motion + c.x);
+        brightness = 0.3 + 0.25 * sin(seconds * STAR_TWINKLE * motion + c.x);
         smallest = 1.2;
     } else {
         world = settle(a.xyz);
         if (state > 0.5) {
-            size = size * (1.0 + 0.14 * sin(seconds * 2.2 + c.x) * motion);
-            let since = seconds - c.y;
+            size = size * (1.0 + 0.14 * sin(seconds * ORB_PULSE + c.x) * motion);
+            // A flash that began just before the clock wrapped carries on.
+            var since = seconds - c.y;
+            if (since < -0.5 * CLOCK_WRAP) {
+                since = since + CLOCK_WRAP;
+            }
             if (since >= 0.0) {
                 boost = exp(-since * 3.0) * motion;
             }

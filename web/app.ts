@@ -12,14 +12,19 @@ interface TagInfo {
 
 interface Manifest {
   build: string;
+  /** How many data/slugs files there are. */
+  slugBuckets: number;
   count: number;
   chunk: number;
   defaultColor: string;
   tags: TagInfo[];
 }
 
-/** One row of data/notes/<chunk>.json: slug, title, date, tags, summary. */
-type NoteRow = [string, string, string, number[], string];
+/**
+ * One row of data/notes/<chunk>.json: slug, title, date, tags, summary, and
+ * the language when it is not English.
+ */
+type NoteRow = [string, string, string, number[], string, string?];
 
 interface Note {
   id: number;
@@ -28,6 +33,7 @@ interface Note {
   date: string;
   tags: number[];
   summary: string;
+  lang: string;
 }
 
 interface SceneBindings {
@@ -133,13 +139,14 @@ function loadChunk(chunk: number): Promise<Note[]> {
   let pending = chunks.get(chunk);
   if (!pending) {
     pending = fetchJson<NoteRow[]>(`data/notes/${chunk}.json`).then((rows) =>
-      rows.map(([slug, title, date, tags, summary], offset) => ({
+      rows.map(([slug, title, date, tags, summary, lang], offset) => ({
         id: chunk * manifest.chunk + offset,
         slug,
         title,
         date,
         tags,
         summary,
+        lang: lang ?? "en",
       })),
     );
     pending.catch(() => chunks.delete(chunk));
@@ -160,6 +167,34 @@ async function loadNote(id: number): Promise<Note | undefined> {
     loadedNotes.set(note.id, note);
   }
   return loadedNotes.get(id);
+}
+
+/** Which data/slugs file holds a slug. `slug_bucket` in build.py matches it. */
+function slugBucket(slug: string, buckets: number): number {
+  let value = 0x811c9dc5; // 32-bit FNV-1a
+  for (const byte of new TextEncoder().encode(slug)) {
+    value = Math.imul(value ^ byte, 0x01000193) >>> 0;
+  }
+  return value % buckets;
+}
+
+/**
+ * The number of the note a "?note=" link names, or -1. The link carries the
+ * note's address, which never changes. Its number does: it moves whenever a
+ * note with an earlier date is added.
+ */
+async function findNote(wanted: string): Promise<number> {
+  if (!wanted) {
+    return -1;
+  }
+  try {
+    const bucket = slugBucket(wanted, Math.max(1, manifest.slugBuckets));
+    const slugs = await fetchJson<Record<string, number>>(`data/slugs/${bucket}.json`);
+    return slugs[wanted] ?? -1;
+  } catch (error) {
+    console.error(error);
+    return -1;
+  }
 }
 
 let tagIndex: Promise<Uint16Array> | null = null;
@@ -328,6 +363,7 @@ function tagLink(tag: number): HTMLAnchorElement | null {
   }
   const link = document.createElement("a");
   link.className = "tag";
+  link.dir = "auto";
   link.href = `${base}tags/${encodeURIComponent(info.name)}/`;
   link.style.setProperty("--tag", info.color);
   link.textContent = `#${info.name}`;
@@ -352,6 +388,18 @@ function tagList(note: Note): HTMLUListElement | null {
   return list;
 }
 
+/**
+ * Lets the browser lay a title or summary out in its own direction, so a
+ * Persian note reads right to left among English ones.
+ */
+function inItsLanguage<T extends HTMLElement>(target: T, note: Note): T {
+  target.dir = "auto";
+  if (note.lang !== "en") {
+    target.lang = note.lang;
+  }
+  return target;
+}
+
 function shortDate(date: string): string {
   const [, month, day] = date.split("-").map(Number);
   return `${MONTHS[(month ?? 1) - 1]!.slice(0, 3)} ${day}`;
@@ -372,13 +420,13 @@ function noteItem(note: Note): HTMLElement {
   time.dateTime = note.date;
   time.textContent = shortDate(note.date);
 
-  const heading = document.createElement("h3");
+  const heading = inItsLanguage(document.createElement("h3"), note);
   const title = document.createElement("a");
   title.href = address;
   title.textContent = note.title;
   heading.append(title);
 
-  const summary = document.createElement("p");
+  const summary = inItsLanguage(document.createElement("p"), note);
   summary.textContent = note.summary;
   const result = excerpts.get(note.id);
   if (result) {
@@ -422,6 +470,7 @@ async function renderMore(): Promise<void> {
   }
   listBusy = true;
   const run = listRun;
+  let failed = false;
   listMore.textContent = "Loading more notes…";
   try {
     const end = Math.min(rendered + LIST_BATCH, listLength());
@@ -454,16 +503,21 @@ async function renderMore(): Promise<void> {
     rendered = end;
   } catch (error) {
     console.error(error);
+    failed = true;
   } finally {
     listBusy = false;
-    if (run === listRun) {
+    if (run !== listRun) {
+      void renderMore();
+    } else if (failed) {
+      // Do not try again straight away: with the network down that would
+      // repeat without pause. The next scroll tries again.
+      listMore.textContent = "Could not load more notes. Scroll to try again.";
+    } else {
       listMore.textContent = rendered >= listLength() && rendered > LIST_BATCH ? "End of timeline" : "";
       // Keep going while the end of the list is still on screen.
       if (view === "list" && rendered < listLength() && nearEndOfList()) {
         void renderMore();
       }
-    } else {
-      void renderMore();
     }
   }
 }
@@ -535,10 +589,10 @@ async function openPreview(id: number): Promise<void> {
   eyebrow.className = "eyebrow";
   eyebrow.textContent = longDate(note.date);
 
-  const heading = document.createElement("h2");
+  const heading = inItsLanguage(document.createElement("h2"), note);
   heading.textContent = note.title;
 
-  const summary = document.createElement("p");
+  const summary = inItsLanguage(document.createElement("p"), note);
   summary.textContent = note.summary;
 
   const actions = document.createElement("div");
@@ -590,6 +644,8 @@ const labels = new Map<number, HTMLElement>();
 const labelWidths = new Map<number, number>();
 const reticles: HTMLElement[] = [];
 const LABEL_HEIGHT = 22;
+/** Hidden labels kept ready for reuse. Beyond this many they are removed. */
+const LABEL_POOL = 96;
 
 function reticle(index: number): HTMLElement {
   let found = reticles[index];
@@ -619,6 +675,9 @@ function labelFor(id: number): HTMLElement | null {
   label.className = "scene-label";
   label.dataset.note = String(id);
   label.tabIndex = -1;
+  if (note.lang !== "en") {
+    label.lang = note.lang;
+  }
   label.textContent = note.title;
   const first = note.tags[0];
   label.style.setProperty("--tag", (first !== undefined && first !== NO_TAG ? manifest.tags[first]?.color : undefined)
@@ -686,7 +745,16 @@ function placeLabels(): void {
     }
 
     for (const [id, label] of labels) {
-      if (!shown.has(id)) {
+      if (shown.has(id)) {
+        continue;
+      }
+      if (labels.size > LABEL_POOL) {
+        // Moving through thousands of notes would otherwise leave a hidden
+        // label behind for every one of them.
+        label.remove();
+        labels.delete(id);
+        labelWidths.delete(id);
+      } else {
         label.style.display = "none";
       }
     }
@@ -876,7 +944,7 @@ async function start(): Promise<void> {
     }
   }
   const wantsList = parameters.get("view") === "list";
-  const wantedNote = Number(parameters.get("note") ?? -1);
+  const wantedNote = findNote(parameters.get("note") ?? "");
   if (query || activeTags.size > 0) {
     await applyFilters();
   }
@@ -898,11 +966,11 @@ async function start(): Promise<void> {
   requestAnimationFrame(placeLabels);
 
   // The scene is the default view, unless the address asks for the list.
-  const locating = Number.isInteger(wantedNote) && wantedNote >= 0 && wantedNote < manifest.count;
-  if (locating || (waiting && !wantsList)) {
+  const located = await wantedNote;
+  if (located >= 0 || (waiting && !wantsList)) {
     setView("3d");
-    if (locating) {
-      scene.select(wantedNote);
+    if (located >= 0) {
+      scene.select(located);
     }
   } else {
     setView("list");

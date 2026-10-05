@@ -17,8 +17,19 @@
   --header-height: 88px;
   --toolbar-height: 104px;
   --page-gutter: clamp(1rem, 4vw, 4.5rem);
-  --mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  --mono: "Vazirmatn", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
   --scale: 1.5;
+}
+
+/* Vazirmatn draws Persian and Arabic. The range keeps it to those letters, so
+   a page without them never downloads it and Latin text keeps its own font. */
+@font-face {
+  font-family: "Vazirmatn";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("../fonts/Vazirmatn-Regular.woff2") format("woff2");
+  unicode-range: U+0600-06FF, U+0750-077F, U+08A0-08FF, U+200C-200F, U+FB50-FDFF, U+FE70-FEFF;
 }
 
 *,
@@ -353,6 +364,7 @@ a:hover {
 }
 
 .scene-label {
+  unicode-bidi: isolate;
   position: absolute;
   top: 0;
   left: 0;
@@ -714,7 +726,7 @@ body:not(.view-3d) .preview {
 
 .prose ul,
 .prose ol {
-  padding-left: 1.6em;
+  padding-inline-start: 1.6em;
 }
 
 .prose li::marker {
@@ -722,9 +734,28 @@ body:not(.view-3d) .preview {
 }
 
 .prose blockquote {
-  padding: 0.2em 0 0.2em 1.2em;
-  border-left: 1px solid var(--line-strong);
+  padding-block: 0.2em;
+  padding-inline-start: 1.2em;
+  border-inline-start: 1px solid var(--line-strong);
   color: var(--ink-muted);
+}
+
+/* Right-to-left notes. Persian letters are taller than Latin ones, so the
+   lines get more room. Code stays left to right. */
+.prose[dir="rtl"] {
+  line-height: 2.1;
+}
+
+.prose[dir="rtl"] pre,
+.prose[dir="rtl"] code {
+  direction: ltr;
+  text-align: left;
+  unicode-bidi: isolate;
+}
+
+.prose[dir="rtl"] .table-wrap th,
+.prose[dir="rtl"] .table-wrap td {
+  text-align: right;
 }
 
 .prose hr {

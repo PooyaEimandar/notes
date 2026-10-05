@@ -7,6 +7,12 @@ pub const FOV_Y: f32 = std::f32::consts::FRAC_PI_4;
 const MAX_PITCH: f32 = 1.35;
 const IDLE_TURN_PER_SECOND: f32 = 0.11;
 
+/// Keeps an angle within one turn. Left to grow, the idle turn would add up
+/// until an f32 could no longer take a frame's worth of rotation.
+fn wrap_angle(angle: f32) -> f32 {
+    angle.rem_euclid(std::f32::consts::TAU)
+}
+
 #[derive(Clone, Copy, Debug)]
 pub struct Projected {
     /// Position in physical pixels, with the origin at the top left.
@@ -105,7 +111,7 @@ impl Orbit {
     }
 
     pub fn rotate(&mut self, pixels: Vec2) {
-        self.yaw -= pixels.x * 0.006;
+        self.yaw = wrap_angle(self.yaw - pixels.x * 0.006);
         self.pitch = (self.pitch + pixels.y * 0.006).clamp(-MAX_PITCH, MAX_PITCH);
     }
 
@@ -114,7 +120,7 @@ impl Orbit {
     }
 
     pub fn turn_idly(&mut self, seconds: f32) {
-        self.yaw += seconds * IDLE_TURN_PER_SECOND;
+        self.yaw = wrap_angle(self.yaw + seconds * IDLE_TURN_PER_SECOND);
     }
 
     /// Moves towards the goals. With `instant` the camera jumps, which is what
@@ -170,7 +176,9 @@ mod tests {
         orbit.show_everything();
         orbit.settle();
         let view = orbit.view(Vec2::new(1600.0, 1000.0), 500.0);
-        let projected = view.project(orbit.target).expect("the target is in front of the camera");
+        let projected = view
+            .project(orbit.target)
+            .expect("the target is in front of the camera");
         assert!(close(projected.pixel.x, 800.0));
         assert!(close(projected.pixel.y, 500.0));
         assert!(close(projected.depth, orbit.distance));
@@ -182,7 +190,9 @@ mod tests {
         orbit.set_offset(Vec2::new(-0.5, 0.25));
         orbit.settle();
         let view = orbit.view(Vec2::new(1000.0, 800.0), 500.0);
-        let projected = view.project(orbit.target).expect("the target is in front of the camera");
+        let projected = view
+            .project(orbit.target)
+            .expect("the target is in front of the camera");
         assert!(close(projected.pixel.x, 250.0));
         assert!(close(projected.pixel.y, 300.0));
     }
@@ -202,6 +212,19 @@ mod tests {
         let mut narrow = Orbit::default();
         narrow.frame(Vec3::ZERO, 10.0, 0.5);
         assert!(narrow.fit() > wide.fit());
+    }
+
+    #[test]
+    fn the_idle_turn_never_stalls() {
+        let mut orbit = Orbit::default();
+        // Ten days of idle turning, in steps far larger than a frame.
+        for _ in 0..864_000 {
+            orbit.turn_idly(1.0);
+        }
+        assert!((0.0..std::f32::consts::TAU).contains(&orbit.yaw));
+        let before = orbit.yaw;
+        orbit.turn_idly(1.0 / 120.0);
+        assert!(orbit.yaw != before);
     }
 
     #[test]

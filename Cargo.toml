@@ -12,16 +12,18 @@ path = "src/lib.rs"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-bytemuck = { version = "1.25.1", features = ["derive"] }
-sib = { git = "https://github.com/PooyaEimandar/sib", default-features = false, features = [
+bytemuck = { version = "1.25.2", features = ["derive"] }
+# Pinned to a commit. Left floating, any `cargo update` would move sib to its
+# newest commit and take whatever changed there with it.
+sib = { git = "https://github.com/PooyaEimandar/sib", rev = "0e023300e80c89bc6247f8ed7a9b498c7653a707", default-features = false, features = [
     "render",
 ] }
 
 # The wasm-bindgen version has to match the wasm-bindgen CLI used by build.py.
 [target.'cfg(target_arch = "wasm32")'.dependencies]
-js-sys = "0.3.103"
-wasm-bindgen = "=0.2.127"
-web-sys = { version = "0.3.103", features = [
+js-sys = "=0.3.106"
+wasm-bindgen = "=0.2.129"
+web-sys = { version = "=0.3.106", features = [
     "CssStyleDeclaration",
     "CustomEvent",
     "CustomEventInit",
@@ -43,4 +45,4 @@ panic = "abort"
 strip = true
 
 [dev-dependencies]
-naga = { version = "30.0.1", features = ["wgsl-in"] }
+naga = { version = "=30.0.1", features = ["wgsl-in"] }

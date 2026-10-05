@@ -49,12 +49,24 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: wasm32-unknown-unknown
+          components: clippy, rustfmt
 
+      - name: Check the TypeScript
+        run: npm run check
+
+      - name: Check and test the scene
+        run: |
+          cargo fmt --check
+          cargo clippy --locked --all-targets -- -D warnings
+          cargo clippy --locked --target wasm32-unknown-unknown --lib -- -D warnings
+          cargo test --locked
+
+      # The CLI has to be the same version as the wasm-bindgen crate, so it is
+      # read from Cargo.lock and the two cannot drift apart.
       - name: Install the matching wasm-bindgen CLI
-        run: cargo install wasm-bindgen-cli --version 0.2.127 --locked
-
-      - name: Check the scene
-        run: cargo test --locked
+        run: |
+          version=$(awk '/^name = "wasm-bindgen"$/ { getline; gsub(/[^0-9.]/, ""); print; exit }' Cargo.lock)
+          cargo install wasm-bindgen-cli --version "$version" --locked
 
       - name: Build the site
         run: python build.py

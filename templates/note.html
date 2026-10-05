@@ -1,5 +1,5 @@
   <main id="content" class="page">
-    <article class="page-inner" lang="{{ lang }}"{{ direction }} data-pagefind-body
+    <article class="page-inner" lang="{{ lang }}" data-pagefind-body
       data-pagefind-sort="date:{{ iso_date }}">
       <header class="page-header">
         <div class="note-bar" data-pagefind-ignore>
@@ -10,13 +10,13 @@
             <a class="btn" href="{{ base }}feed.xml">Feed</a>
           </div>
         </div>
-        <h1 data-pagefind-meta="title">{{ title }}</h1>
+        <h1{{ direction }} data-pagefind-meta="title">{{ title }}</h1>
         <ul class="page-meta" data-pagefind-ignore>
         {{ meta }}
         </ul>
       </header>
 
-      <div class="prose">
+      <div class="prose"{{ direction }}>
 {{ content }}
       </div>
 
@@ -26,7 +26,7 @@
         <div class="note-bar">
           <div class="note-actions">
             <a class="btn" href="{{ base }}?view=list">All notes</a>
-            <a class="btn" href="{{ base }}?note={{ id }}">Locate in 3D</a>
+            <a class="btn" href="{{ base }}?note={{ slug }}">Locate in 3D</a>
           </div>
           <div class="note-share">
             <button class="btn" type="button" data-share="{{ canonical }}" data-title="{{ title }}" aria-live="polite"

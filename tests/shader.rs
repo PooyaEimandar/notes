@@ -16,7 +16,9 @@ fn the_scene_shader_is_valid() {
         .iter()
         .map(|entry| entry.name.as_str())
         .collect();
-    for expected in ["vs_orb", "fs_orb", "vs_link", "fs_link", "vs_floor", "fs_floor"] {
+    for expected in [
+        "vs_orb", "fs_orb", "vs_link", "fs_link", "vs_floor", "fs_floor",
+    ] {
         assert!(entry_points.contains(&expected), "{expected} is missing");
     }
 }

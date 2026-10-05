@@ -41,6 +41,7 @@ nix = "#7e7eff"
 webassembly = "#04133b"
 
 # Topics
+"پارسی" = "#ffffff"
 personal = "#56e8ff"
 technology = "#3178c6"
 graphics = "#5686a5"

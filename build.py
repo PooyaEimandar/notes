@@ -29,6 +29,8 @@ import subprocess
 import sys
 import time
 import tomllib
+import unicodedata
+import urllib.parse
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
@@ -46,6 +48,7 @@ RTL_LANGUAGES = {"ar", "fa", "he", "ur"}
 NO_TAG = 0xFFFF
 MAX_TAGS_PER_NOTE = 5
 MAX_BRIDGES = 200
+SLUGS_PER_BUCKET = 256
 # Runs before the page is drawn. With WebGPU the list is hidden from the first
 # frame, so the scene is the first thing a visitor sees. Without it, or when
 # the address asks for the list, the list shows as usual.
@@ -91,9 +94,27 @@ def esc(value: object) -> str:
 
 
 def slugify(value: str) -> str:
-    value = value.strip().lower()
-    value = re.sub(r"[^a-z0-9]+", "-", value)
+    """Letters and digits of any script, joined by hyphens.
+
+    The text is put in one normal form first. Some Persian letters can be
+    stored two ways, and macOS and Linux would otherwise name the same folder
+    differently.
+    """
+    value = unicodedata.normalize("NFC", value).strip().lower()
+    value = re.sub(r"[^\w]+|_+", "-", value)
     return value.strip("-")
+
+
+def quote(path: str) -> str:
+    """A path as it is written in an address: other scripts percent-encoded."""
+    return urllib.parse.quote(path, safe="/")
+
+
+def is_right_to_left(text: str) -> bool:
+    """True when most of the letters are Arabic or Hebrew script."""
+    letters = [unicodedata.bidirectional(char) for char in text if char.isalpha()]
+    right_to_left = sum(1 for kind in letters if kind in ("R", "AL"))
+    return right_to_left * 2 > len(letters)
 
 
 def normalise_tag(value: str) -> str:
@@ -254,7 +275,9 @@ def normalise_path(path: str) -> str:
                 parts.pop()
             continue
         parts.append(part)
-    return "/".join(parts)
+    # Keep the leading slash of an absolute path, which a note has when
+    # --content points outside the repository.
+    return ("/" if path.startswith("/") else "") + "/".join(parts)
 
 
 def note_key(source: str) -> str:
@@ -287,8 +310,13 @@ def render_markdown(md, body: str, source: str, cache_dir: Path) -> dict[str, ob
 
 # --------------------------------------------------------------------- notes
 
-def git_last_changed(content_dir: Path) -> dict[str, dt.date]:
-    """The date of the last commit that touched each file, from one git call."""
+def git_revised(content_dir: Path) -> dict[str, dt.date]:
+    """The day each file was last revised, from one git call.
+
+    A file counts as revised only if a later commit changed it after the commit
+    that added it. Publishing a note some days after the date written in it is
+    not a revision.
+    """
     try:
         output = subprocess.run(
             ["git", "log", "--format=%x00%cs", "--name-only", "--", str(content_dir)],
@@ -296,19 +324,22 @@ def git_last_changed(content_dir: Path) -> dict[str, dt.date]:
         ).stdout
     except (OSError, subprocess.CalledProcessError):
         return {}
-    changed: dict[str, dt.date] = {}
+    # git lists the newest commit first.
+    newest: dict[str, dt.date] = {}
+    oldest: dict[str, dt.date] = {}
     current: dt.date | None = None
     for line in output.splitlines():
         if line.startswith("\0"):
             current = dt.date.fromisoformat(line[1:].strip())
         elif line.strip() and current is not None:
-            changed.setdefault(line.strip(), current)
-    return changed
+            newest.setdefault(line.strip(), current)
+            oldest[line.strip()] = current
+    return {path: day for path, day in newest.items() if day > oldest[path]}
 
 
-def load_notes(content_dir: Path, cache_dir: Path, include_drafts: bool) -> list[Note]:
+def load_notes(site: "Site", content_dir: Path, cache_dir: Path, include_drafts: bool) -> list[Note]:
     md = make_markdown()
-    changed = git_last_changed(content_dir)
+    revised = git_revised(content_dir)
     notes: list[Note] = []
     slugs: dict[str, str] = {}
 
@@ -356,14 +387,14 @@ def load_notes(content_dir: Path, cache_dir: Path, include_drafts: bool) -> list
 
         note = Note(
             source=source, slug=slug, title=title, date=date, tags=tags, summary=summary,
-            lang=str(meta.get("lang", "en")).strip().lower() or "en",
+            lang=site.language(tags, str(meta.get("lang", "")).strip().lower(), f"{title} {body}"),
             body_html=str(rendered["html"]), words=int(rendered["words"]),  # type: ignore[arg-type]
             asset_dir=path.parent if is_bundle else None,
         )
         if "updated" in meta:
             note.updated = parse_date(meta["updated"], source, "updated")
-        elif source in changed and changed[source] > date:
-            note.updated = changed[source]
+        elif source in revised and revised[source] > date:
+            note.updated = revised[source]
         notes.append(note)
 
     # Oldest first, so a note keeps its number when newer notes are added.
@@ -384,7 +415,7 @@ def resolve_note_links(notes: list[Note], base: str) -> None:
                 raise BuildError(f"{note.source}: links to '{key}', which is not a note")
             if target.slug != note.slug and target.slug not in note.links:
                 note.links.append(target.slug)
-            return f'href="{base}{target.slug}/{fragment}"'
+            return f'href="{base}{quote(target.slug)}/{fragment}"'
 
         note.body_html = re.sub(r'href="note://([^"#]+)(#[^"]*)?"', replace, note.body_html)
 
@@ -566,6 +597,14 @@ def scene_bytes(notes: list[Note], tags: list[dict[str, object]], default_colour
     return bytes(out)
 
 
+def slug_bucket(slug: str, buckets: int) -> int:
+    """Which data/slugs file holds a slug. `slugBucket` in web/app.ts matches it."""
+    value = 0x811C9DC5  # 32-bit FNV-1a
+    for byte in slug.encode("utf-8"):
+        value = ((value ^ byte) * 0x01000193) & 0xFFFFFFFF
+    return value % buckets
+
+
 def index_bytes(notes: list[Note], tags: list[dict[str, object]]) -> bytes:
     """Fourteen bytes per note: the date, then up to five tag numbers."""
     tag_index = {tag["name"]: i for i, tag in enumerate(tags)}
@@ -592,13 +631,31 @@ class Site:
         self.colours, self.default_colour = load_palette()
 
     def url(self, path: str = "") -> str:
-        return f"{self.origin}{self.base}{path}"
+        return f"{self.origin}{self.href(path)}"
+
+    def href(self, path: str = "") -> str:
+        """The address of a page of this site, from the root of the domain."""
+        return f"{self.base}{quote(path)}"
+
+    def language(self, note_tags: list[str], declared: str, text: str) -> str:
+        """The language of a note: what its front matter says, else what its
+        tags say (see `language_tags` in site.toml), else Persian when the text
+        is written right to left, else English."""
+        if declared:
+            return declared
+        by_tag = {normalise_tag(tag): str(lang) for tag, lang in self.config.get("language_tags", {}).items()}  # type: ignore[union-attr]
+        for tag in note_tags:
+            if tag in by_tag:
+                return by_tag[tag]
+        return "fa" if is_right_to_left(text) else "en"
 
     def colour(self, tag: str) -> str:
         return self.colours.get(tag, self.default_colour)
 
     def tag_link(self, tag: str, extra: str = "") -> str:
-        return (f'<a class="tag" href="{self.base}tags/{esc(tag)}/" style="--tag:{self.colour(tag)}"'
+        # dir="auto" puts the # of a Persian tag on its right, where a reader
+        # of Persian expects it.
+        return (f'<a class="tag" dir="auto" href="{self.href(f"tags/{tag}/")}" style="--tag:{self.colour(tag)}"'
                 f'{extra}>#{esc(tag)}</a>')
 
     def nav(self) -> str:
@@ -649,13 +706,16 @@ class Site:
     def note_item(self, note: Note, heading: str = "h3") -> str:
         tags = "".join(f"<li>{self.tag_link(tag)}</li>" for tag in note.tags)
         tag_list = f'\n      <ul class="note-tags" aria-label="Tags">{tags}</ul>' if tags else ""
+        # The browser works out the direction of each title and summary, so a
+        # Persian note sits right to left among English ones.
+        language = ' dir="auto"' + (f' lang="{esc(note.lang)}"' if note.lang != "en" else "")
         return f"""  <article class="note-item" data-id="{note.id}">
     <time datetime="{note.date.isoformat()}">{short_date(note.date)}</time>
     <div>
-      <{heading}><a href="{self.base}{note.slug}/">{esc(note.title)}</a></{heading}>
-      <p>{esc(note.summary)}</p>{tag_list}
+      <{heading}{language}><a href="{self.href(f"{note.slug}/")}">{esc(note.title)}</a></{heading}>
+      <p{language}>{esc(note.summary)}</p>{tag_list}
       <div class="note-actions">
-        <a class="btn" href="{self.base}{note.slug}/" aria-label="Read more: {esc(note.title)}">Read more</a>
+        <a class="btn" href="{self.href(f"{note.slug}/")}" aria-label="Read more: {esc(note.title)}">Read more</a>
         <button class="btn" type="button" data-locate="{note.id}" hidden>Locate in 3D</button>
       </div>
     </div>
@@ -699,7 +759,9 @@ def build_index(site: Site, notes: list[Note], tags: list[dict[str, object]]) ->
         "blogPost": [{"@type": "BlogPosting", "headline": n.title, "url": site.url(f"{n.slug}/"),
                       "datePublished": n.date.isoformat()} for n in newest[:20]],
     }
-    scripts = f'<script type="module" src="{site.base}assets/js/app.js?v={site.build_id}"></script>'
+    # If the script cannot be loaded, nothing would ever show the list again.
+    scripts = (f'<script type="module" src="{site.base}assets/js/app.js?v={site.build_id}" '
+               f'onerror="document.documentElement.classList.remove(\'waiting-for-scene\')"></script>')
     site.page(path="", title=str(config["title"]), description=str(config["description"]), body=body,
               body_class="page-index view-list", og_type="website", json_ld=json_ld, scripts=scripts,
               head_extra=WAIT_FOR_SCENE)
@@ -712,9 +774,11 @@ def build_notes(site: Site, notes: list[Note]) -> None:
         newer = notes[position + 1] if position + 1 < len(notes) else None
         neighbours = []
         if older:
-            neighbours.append(f'<a href="{site.base}{older.slug}/" rel="prev">&larr; {esc(older.title)}</a>')
+            neighbours.append(f'<a href="{site.href(f"{older.slug}/")}" rel="prev">&larr; '
+                              f'<bdi>{esc(older.title)}</bdi></a>')
         if newer:
-            neighbours.append(f'<a href="{site.base}{newer.slug}/" rel="next">{esc(newer.title)} &rarr;</a>')
+            neighbours.append(f'<a href="{site.href(f"{newer.slug}/")}" rel="next">'
+                              f'<bdi>{esc(newer.title)}</bdi> &rarr;</a>')
 
         meta = []
         for tag in note.tags:
@@ -730,6 +794,7 @@ def build_notes(site: Site, notes: list[Note]) -> None:
         body = render_template("note.html", {
             "base": site.base,
             "id": note.id,
+            "slug": quote(note.slug),
             "lang": esc(note.lang),
             "direction": direction,
             "iso_date": note.date.isoformat(),
@@ -791,7 +856,7 @@ def build_tag_pages(site: Site, notes: list[Note], tags: list[dict[str, object]]
         more = ""
         if len(tagged) > limit:
             more = (f'<p class="list-more">Showing the newest {limit} of {len(tagged)} notes. '
-                    f'<a href="{site.base}?tag={esc(name)}&amp;view=list">Browse all of them</a>.</p>')
+                    f'<a href="{site.base}?tag={quote(name)}&amp;view=list">Browse all of them</a>.</p>')
         label = f"{len(tagged)} note" + ("" if len(tagged) == 1 else "s")
         body = render_template("tag.html", {
             "base": site.base,
@@ -827,21 +892,38 @@ def build_data(site: Site, notes: list[Note], tags: list[dict[str, object]]) -> 
     tag_index = {tag["name"]: i for i, tag in enumerate(tags)}
     data = site.out / "data"
     for start in range(0, len(notes), chunk):
+        # The language is listed only for notes that are not in English.
         rows = [[n.slug, n.title, n.date.isoformat(), [tag_index[t] for t in n.tags], n.summary]
+                + ([n.lang] if n.lang != "en" else [])
                 for n in notes[start:start + chunk]]
         write(data / "notes" / f"{start // chunk}.json", json.dumps(rows, ensure_ascii=False, separators=(",", ":")))
+    # A link to a note in the scene names the note by its address, which never
+    # changes, and these files turn the address into today's number. They are
+    # split up so a visitor downloads a few hundred entries, not all of them.
+    buckets = max(1, math.ceil(len(notes) / SLUGS_PER_BUCKET))
+    by_bucket: list[dict[str, int]] = [{} for _ in range(buckets)]
+    for note in notes:
+        by_bucket[slug_bucket(note.slug, buckets)][note.slug] = note.id
+    for number, slugs in enumerate(by_bucket):
+        write(data / "slugs" / f"{number}.json", json.dumps(slugs, separators=(",", ":")))
     write(data / "index.bin", index_bytes(notes, tags))
     write(data / "scene.bin", scene_bytes(notes, tags, site.default_colour))
     write(data / "manifest.json", json.dumps({
         "build": site.build_id,
         "count": len(notes),
         "chunk": chunk,
+        "slugBuckets": buckets,
         "defaultColor": site.default_colour,
         "tags": tags,
     }, ensure_ascii=False, separators=(",", ":")))
 
 
 def build_feed(site: Site, notes: list[Note]) -> None:
+    """The feed carries each note's summary and a link, not its text.
+
+    The articles are all rights reserved, and a feed with the full text is the
+    easiest way to copy them wholesale.
+    """
     config = site.config
     newest = list(reversed(notes))[: int(config["feed_size"])]  # type: ignore[call-overload]
     updated = max((n.updated or n.date for n in notes), default=dt.date.today())
@@ -855,7 +937,6 @@ def build_feed(site: Site, notes: list[Note]) -> None:
     <published>{note.date.isoformat()}T00:00:00Z</published>
     <updated>{(note.updated or note.date).isoformat()}T00:00:00Z</updated>
     <summary>{esc(note.summary)}</summary>{categories}
-    <content type="html">{esc(note.body_html)}</content>
   </entry>""")
     feed = f"""<?xml version="1.0" encoding="UTF-8"?>
 <feed xmlns="http://www.w3.org/2005/Atom">
@@ -910,6 +991,14 @@ def build_wasm(site: Site, release: bool) -> None:
     if shutil.which("wasm-bindgen") is None:
         raise BuildError("wasm-bindgen is not installed. Install the version recorded in Cargo.lock with "
                          "'cargo install wasm-bindgen-cli --version <version> --locked'.")
+    # A CLI of another version fails with an error that does not say why.
+    locked = re.search(r'name = "wasm-bindgen"\nversion = "([^"]+)"',
+                       (ROOT / "Cargo.lock").read_text(encoding="utf-8"))
+    installed = subprocess.run(["wasm-bindgen", "--version"], capture_output=True, text=True).stdout.split()
+    if locked and (len(installed) < 2 or installed[1] != locked.group(1)):
+        raise BuildError(f"wasm-bindgen {installed[1] if len(installed) > 1 else '?'} is installed, but Cargo.lock "
+                         f"needs {locked.group(1)}. Run 'cargo install wasm-bindgen-cli --version "
+                         f"{locked.group(1)} --locked'.")
     profile = "release" if release else "debug"
     command = ["cargo", "build", "--locked", "--target", "wasm32-unknown-unknown", "--lib"]
     if release:
@@ -930,7 +1019,11 @@ def build_wasm(site: Site, release: bool) -> None:
 
 
 def build_search(site: Site, notes: list[Note]) -> None:
-    run([sys.executable, "-m", "pagefind", "--site", str(site.out), "--output-subdir", "pagefind"])
+    # Pagefind keeps one index per language and searches only the language of
+    # the page it is on. Forcing one language puts every note, Persian ones
+    # included, in the index that the search box uses.
+    run([sys.executable, "-m", "pagefind", "--site", str(site.out), "--output-subdir", "pagefind",
+         "--force-language", "en"])
     # Pagefind names every page by a hash. This table turns those names into
     # note numbers, so a search can light up notes in the scene without
     # downloading each result.
@@ -943,7 +1036,7 @@ def build_search(site: Site, notes: list[Note]) -> None:
         start = raw.find(b"{")
         if start < 0:
             raise BuildError(f"{fragment.name}: Pagefind's fragment format has changed")
-        url = json.loads(raw[start:])["url"]
+        url = urllib.parse.unquote(json.loads(raw[start:])["url"])
         if url not in by_url:
             raise BuildError(f"{fragment.name}: Pagefind indexed {url}, which is not a note")
         table[fragment.name.split(".")[0]] = by_url[url]
@@ -967,7 +1060,7 @@ def command_build(args: argparse.Namespace) -> None:
     site = Site(config, out, build_id)
 
     log(f"Reading notes from {content}")
-    notes = load_notes(content, ROOT / ".cache" / "markdown", args.drafts)
+    notes = load_notes(site, content, ROOT / ".cache" / "markdown", args.drafts)
     if not notes:
         raise BuildError("there are no notes to publish")
     resolve_note_links(notes, site.base)

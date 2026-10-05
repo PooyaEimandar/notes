@@ -110,46 +110,57 @@ impl Gpu {
             operation: wgpu::BlendOperation::Add,
         };
         let format = context.surface_config.format;
-        let pipeline = |label: &'static str,
-                        vertex: &'static str,
-                        fragment: &'static str,
-                        buffers: &[Option<wgpu::VertexBufferLayout<'static>>]| {
-            device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-                label: Some(label),
-                layout: Some(&pipeline_layout),
-                vertex: wgpu::VertexState {
-                    module: &module,
-                    entry_point: Some(vertex),
-                    compilation_options: Default::default(),
-                    buffers,
-                },
-                fragment: Some(wgpu::FragmentState {
-                    module: &module,
-                    entry_point: Some(fragment),
-                    compilation_options: Default::default(),
-                    targets: &[Some(wgpu::ColorTargetState {
-                        format,
-                        blend: Some(wgpu::BlendState {
-                            color: additive,
-                            alpha: additive,
-                        }),
-                        write_mask: wgpu::ColorWrites::ALL,
-                    })],
-                }),
-                primitive: wgpu::PrimitiveState {
-                    cull_mode: None,
-                    ..Default::default()
-                },
-                depth_stencil: None,
-                multisample: wgpu::MultisampleState::default(),
-                multiview_mask: None,
-                cache: None,
-            })
-        };
+        let pipeline =
+            |label: &'static str,
+             vertex: &'static str,
+             fragment: &'static str,
+             buffers: &[Option<wgpu::VertexBufferLayout<'static>>]| {
+                device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+                    label: Some(label),
+                    layout: Some(&pipeline_layout),
+                    vertex: wgpu::VertexState {
+                        module: &module,
+                        entry_point: Some(vertex),
+                        compilation_options: Default::default(),
+                        buffers,
+                    },
+                    fragment: Some(wgpu::FragmentState {
+                        module: &module,
+                        entry_point: Some(fragment),
+                        compilation_options: Default::default(),
+                        targets: &[Some(wgpu::ColorTargetState {
+                            format,
+                            blend: Some(wgpu::BlendState {
+                                color: additive,
+                                alpha: additive,
+                            }),
+                            write_mask: wgpu::ColorWrites::ALL,
+                        })],
+                    }),
+                    primitive: wgpu::PrimitiveState {
+                        cull_mode: None,
+                        ..Default::default()
+                    },
+                    depth_stencil: None,
+                    multisample: wgpu::MultisampleState::default(),
+                    multiview_mask: None,
+                    cache: None,
+                })
+            };
 
         Self {
-            orb_pipeline: pipeline("notes orbs", "vs_orb", "fs_orb", &[Some(Instance::layout())]),
-            link_pipeline: pipeline("notes links", "vs_link", "fs_link", &[Some(Instance::layout())]),
+            orb_pipeline: pipeline(
+                "notes orbs",
+                "vs_orb",
+                "fs_orb",
+                &[Some(Instance::layout())],
+            ),
+            link_pipeline: pipeline(
+                "notes links",
+                "vs_link",
+                "fs_link",
+                &[Some(Instance::layout())],
+            ),
             floor_pipeline: pipeline("notes floor", "vs_floor", "fs_floor", &[]),
             globals,
             bind_group,
@@ -185,7 +196,8 @@ impl Gpu {
         clear: wgpu::Color,
         empty: bool,
     ) {
-        let mut pass = render_pass::begin_color_depth(encoder, "notes scene", view, None, clear, 1.0);
+        let mut pass =
+            render_pass::begin_color_depth(encoder, "notes scene", view, None, clear, 1.0);
         if empty {
             return;
         }
