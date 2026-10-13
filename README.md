@@ -31,7 +31,7 @@ The note, in Markdown.
 | `slug`    | no       | The address of the note. Defaults to the file name.                  |
 | `lang`    | no       | The language, such as `fa`. Worked out from the tags and the text. Defaults to `en`   |
 | `draft`   | no       | `true` keeps the note out of the site.                               |
-| `image`   | no       | The cover: a file next to the note, or an address. Shown in the list and over the note's header. |
+| `image`   | no       | The cover: a file next to the note, which the build renders as WebP and JPEG at several widths, or an address on another site, where the build uses the `.webp` and `.jpg` that exist beside it. |
 | `image_alt` | no     | What the cover shows, for readers who cannot see it.                 |
 
 A note that needs images can be a folder: `content/2026/my-note/index.md`, with

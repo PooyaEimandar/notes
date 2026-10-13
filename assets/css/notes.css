@@ -873,6 +873,19 @@ body:not(.view-3d) .preview {
   background: var(--line);
 }
 
+/* An embedded video keeps its proportions at any width. */
+.prose .video {
+  margin: 0 0 1.4em;
+}
+
+.prose .video iframe {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 16 / 9;
+  border: 1px solid var(--line);
+}
+
 .prose img,
 .prose video {
   max-width: 100%;

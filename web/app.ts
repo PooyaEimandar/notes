@@ -20,8 +20,12 @@ interface Manifest {
   tags: TagInfo[];
 }
 
-/** A cover the build rendered: address prefix, widths, and the original size. */
-type RenderedCover = [string, number[], number, number];
+/**
+ * A cover: address prefix, widths, the original size, and the formats it comes
+ * in. The build rendered it at those widths, or, when the widths are empty, it
+ * lives on another site in one size as `<address>.<format>`.
+ */
+type RenderedCover = [string, number[], number, number, string[]];
 
 /**
  * One row of data/notes/<chunk>.json: slug, title, date, tags, summary,
@@ -409,7 +413,7 @@ function inItsLanguage<T extends HTMLElement>(target: T, note: Note): T {
   return target;
 }
 
-const COVER_FORMATS: [string, string][] = [["avif", "image/avif"], ["webp", "image/webp"]];
+const COVER_TYPES: Record<string, string> = { webp: "image/webp", jpg: "image/jpeg" };
 
 /** The note's cover as the build.py `cover` function writes it, or null. */
 function cover(note: Note, className: string, sizes: string): HTMLElement | null {
@@ -425,21 +429,34 @@ function cover(note: Note, className: string, sizes: string): HTMLElement | null
     image.src = note.cover;
     return image;
   }
-  const [address, widths, width, height] = note.cover;
-  const srcset = (extension: string) => widths.map((w) => `${address}-${w}.${extension} ${w}w`).join(", ");
+  const [address, widths, width, height, formats] = note.cover;
+  const remote = widths.length === 0;
+  const file = (extension: string, w: number) => (remote ? `${address}.${extension}` : `${address}-${w}.${extension}`);
+  const srcset = (extension: string) =>
+    remote ? file(extension, 0) : widths.map((w) => `${file(extension, w)} ${w}w`).join(", ");
+  const fallback = formats.includes("jpg") ? "jpg" : formats[formats.length - 1]!;
   const picture = document.createElement("picture");
-  for (const [extension, type] of COVER_FORMATS) {
+  for (const extension of formats) {
+    if (extension === fallback) {
+      continue;
+    }
     const source = document.createElement("source");
-    source.type = type;
+    source.type = COVER_TYPES[extension] ?? "";
     source.srcset = srcset(extension);
-    source.sizes = sizes;
+    if (!remote) {
+      source.sizes = sizes;
+    }
     picture.append(source);
   }
-  image.src = `${address}-${widths[widths.length - 1]}.jpg`;
-  image.srcset = srcset("jpg");
-  image.sizes = sizes;
-  image.width = width;
-  image.height = height;
+  image.src = file(fallback, widths[widths.length - 1] ?? 0);
+  image.srcset = srcset(fallback);
+  if (!remote) {
+    image.sizes = sizes;
+  }
+  if (width && height) {
+    image.width = width;
+    image.height = height;
+  }
   picture.append(image);
   return picture;
 }

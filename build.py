@@ -48,12 +48,11 @@ RTL_LANGUAGES = {"ar", "fa", "he", "ur"}
 NO_TAG = 0xFFFF
 MAX_TAGS_PER_NOTE = 5
 MAX_BRIDGES = 200
-# Covers are rendered at these widths (no wider than the original), in these
-# formats. Browsers take the first format they can show; every one can show
-# JPEG.
+# Covers are rendered at these widths (no wider than the original), as WebP
+# with a JPEG fallback for browsers that cannot show WebP.
 COVER_WIDTHS = [480, 960, 1600]
-COVER_FORMATS = [("avif", "image/avif"), ("webp", "image/webp"), ("jpg", "image/jpeg")]
-COVER_SETTINGS = "v1 avif60 webp80 jpg82"
+COVER_FORMATS = [("webp", "image/webp"), ("jpg", "image/jpeg")]
+COVER_SETTINGS = "v2 webp80 jpg82"
 SLUGS_PER_BUCKET = 256
 # Runs before the page is drawn. With WebGPU the list is hidden from the first
 # frame, so the scene is the first thing a visitor sees. Without it, or when
@@ -98,15 +97,29 @@ class Note:
 
 @dataclasses.dataclass
 class Cover:
-    """A cover rendered as `<address>-<width>.<format>` for every width and
-    format, with the picture's own proportions."""
-    address: str  # for example "hello/cover"
+    """A cover in several formats, with the picture's own proportions.
+
+    One the build rendered is `<address>-<width>.<format>` for every width and
+    format. One on another site is `<address>.<format>` for the formats that
+    site has; it comes in one size, so `widths` is empty.
+    """
+    address: str  # for example "hello/cover", or "https://.../picture"
     widths: list[int]
     width: int
     height: int
+    formats: list[str] = dataclasses.field(default_factory=lambda: [ext for ext, _ in COVER_FORMATS])
+
+    @property
+    def remote(self) -> bool:
+        return not self.widths
 
     def file(self, width: int, extension: str) -> str:
+        if self.remote:
+            return f"{self.address}.{extension}"
         return f"{self.address}-{width}.{extension}"
+
+    def largest(self, extension: str) -> str:
+        return self.file(self.widths[-1] if self.widths else 0, extension)
 
 
 # ---------------------------------------------------------------- utilities
@@ -512,7 +525,6 @@ def render_cover(note: Note, cache_dir: Path, out: Path) -> Cover:
         for width in widths:
             height = round(picture.height * width / picture.width)
             sized = picture.resize((width, height), Image.Resampling.LANCZOS)
-            sized.save(cached / f"cover-{width}.avif", quality=60, speed=6)
             sized.save(cached / f"cover-{width}.webp", quality=80, method=4)
             sized.save(cached / f"cover-{width}.jpg", quality=82, optimize=True, progressive=True)
         write(manifest, json.dumps({"widths": widths, "width": picture.width, "height": picture.height}))
@@ -525,6 +537,52 @@ def render_cover(note: Note, cache_dir: Path, out: Path) -> Cover:
         for extension, _ in COVER_FORMATS:
             shutil.copy2(cached / f"cover-{width}.{extension}", target / f"cover-{width}.{extension}")
     return cover
+
+
+def remote_cover(note: Note, cache_file: Path) -> Cover | None:
+    """Describes a cover on another site: which of the WebP and JPEG files
+    exist beside the address given, and the picture's size.
+
+    The answers are kept for a week, so a rebuild does not ask again.
+    """
+    import urllib.error
+    import urllib.request
+    from PIL import Image
+
+    address, dot, extension = note.image.rpartition(".")
+    if not dot or extension.lower() not in {ext for ext, _ in COVER_FORMATS} | {"jpeg", "png"}:
+        return None
+    cache: dict[str, dict[str, object]] = {}
+    if cache_file.exists():
+        cache = json.loads(cache_file.read_text(encoding="utf-8"))
+    known = cache.get(note.image)
+    if known and time.time() - float(known["checked"]) < 7 * 86400:  # type: ignore[arg-type]
+        return Cover(address, [], int(known["width"]), int(known["height"]), list(known["formats"]))  # type: ignore[arg-type,call-overload]
+
+    formats: list[str] = []
+    width = height = 0
+    for ext, _ in COVER_FORMATS:
+        candidate = note.image if ext == extension.lower() else f"{address}.{ext}"
+        try:
+            with urllib.request.urlopen(urllib.request.Request(candidate, method="HEAD"), timeout=10) as answer:
+                if answer.status == 200:
+                    formats.append(ext)
+        except (urllib.error.URLError, OSError, ValueError):
+            continue
+    if "jpg" not in formats and extension.lower() in ("jpeg", "png"):
+        formats.append(extension.lower())
+    if "jpg" not in formats and extension.lower() not in ("jpeg", "png"):
+        log(f"  warning: {note.source}: no JPEG found beside {note.image}; using it as it is")
+        return None
+    try:
+        with urllib.request.urlopen(note.image, timeout=20) as answer:
+            with Image.open(answer) as picture:
+                width, height = picture.size
+    except Exception as error:  # noqa: BLE001 - any failure just means no size
+        log(f"  warning: {note.source}: could not read the size of {note.image}: {error}")
+    cache[note.image] = {"checked": time.time(), "formats": formats, "width": width, "height": height}
+    write(cache_file, json.dumps(cache, indent=2))
+    return Cover(address, [], width, height, formats)
 
 
 # --------------------------------------------------------------------- scene
@@ -785,10 +843,16 @@ class Site:
         return {"@type": "Person", "name": self.config["author"], "url": self.origin + "/",
                 "sameAs": self.config.get("same_as", [])}
 
+    def cover_href(self, cover: Cover, width: int, extension: str) -> str:
+        """The address of one file of a cover, on this site or another."""
+        return cover.file(width, extension) if cover.remote else self.href(cover.file(width, extension))
+
     def social_image(self, note: Note) -> str:
         """The picture shown when the note is shared: the largest JPEG."""
         if note.cover:
-            return self.url(note.cover.file(note.cover.widths[-1], "jpg"))
+            jpg = "jpg" if "jpg" in note.cover.formats else note.cover.formats[-1]
+            file = note.cover.largest(jpg)
+            return file if note.cover.remote else self.url(file)
         return note.image or str(self.config["social_image"])
 
     def cover(self, note: Note, css_class: str, sizes: str, eager: bool = False) -> str:
@@ -800,15 +864,22 @@ class Site:
                 return ""
             return f'<img class="{css_class}" src="{esc(note.image)}" {alt}{loading}>'
         cover = note.cover
+        size = f' width="{cover.width}" height="{cover.height}"' if cover.width and cover.height else ""
         sources = []
+        fallback = "jpg" if "jpg" in cover.formats else cover.formats[-1]
         for extension, mime in COVER_FORMATS:
-            srcset = ", ".join(f"{self.href(cover.file(width, extension))} {width}w" for width in cover.widths)
-            if extension == "jpg":
-                sources.append(f'<img class="{css_class}" src="{self.href(cover.file(cover.widths[-1], "jpg"))}" '
-                               f'srcset="{srcset}" sizes="{sizes}" width="{cover.width}" height="{cover.height}" '
-                               f'{alt}{loading}>')
+            if extension not in cover.formats:
+                continue
+            if cover.remote:
+                srcset, fit = esc(cover.file(0, extension)), ""
             else:
-                sources.append(f'<source type="{mime}" srcset="{srcset}" sizes="{sizes}">')
+                srcset = ", ".join(f"{self.href(cover.file(width, extension))} {width}w" for width in cover.widths)
+                fit = f' sizes="{sizes}"'
+            if extension == fallback:
+                sources.append(f'<img class="{css_class}" src="{esc(self.cover_href(cover, cover.widths[-1] if cover.widths else 0, fallback))}" '
+                               f'srcset="{srcset}"{fit}{size} {alt}{loading}>')
+            else:
+                sources.append(f'<source type="{mime}" srcset="{srcset}"{fit}>')
         return "<picture>" + "".join(sources) + "</picture>"
 
     def note_item(self, note: Note, heading: str = "h3") -> str:
@@ -884,6 +955,8 @@ def build_covers(site: Site, notes: list[Note]) -> None:
     for note in notes:
         if note.image_source is not None:
             note.cover = render_cover(note, ROOT / ".cache" / "covers", site.out)
+        elif note.image.startswith(("http://", "https://")):
+            note.cover = remote_cover(note, ROOT / ".cache" / "remote-covers.json")
 
 
 def build_notes(site: Site, notes: list[Note]) -> None:
@@ -1019,7 +1092,8 @@ def build_data(site: Site, notes: list[Note], tags: list[dict[str, object]]) -> 
         # bare address for a picture elsewhere, and an empty string for none.
         def cover_row(n: Note) -> object:
             if n.cover:
-                return [site.href(n.cover.address), n.cover.widths, n.cover.width, n.cover.height]
+                address = n.cover.address if n.cover.remote else site.href(n.cover.address)
+                return [address, n.cover.widths, n.cover.width, n.cover.height, n.cover.formats]
             return n.image
 
         rows = [[n.slug, n.title, n.date.isoformat(), [tag_index[t] for t in n.tags], n.summary, n.lang,
