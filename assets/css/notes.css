@@ -1118,12 +1118,36 @@ body:not(.view-3d) .preview {
     grid-template-columns: 1fr;
   }
 
-  /* Under the article the buttons wrap onto two rows. Share and RSS take
-     the first one, so they stay level with the pair above the article. */
+  /* Under the article the buttons wrap onto two rows, both starting at the
+     left edge, so Share and RSS line up with All notes. */
+  .note-footer .note-bar {
+    justify-content: flex-start;
+    gap: 0.6rem;
+  }
+
   .note-footer .note-share {
-    order: -1;
-    width: 100%;
-    justify-content: flex-end;
+    margin-left: 0;
+  }
+
+  /* Over a cover, a phone has no room for the tags and the buttons side by
+     side: the buttons take their own row, and the band is half the cover
+     rather than a third, so the picture is not cropped away. */
+  .page-header.has-cover {
+    grid-template-rows: 1fr 1fr;
+  }
+
+  .page-header.has-cover .page-header-text {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      "date"
+      "title"
+      "meta"
+      "share";
+  }
+
+  .page-header.has-cover .note-share {
+    justify-self: end;
+    margin-top: 0.75rem;
   }
 
   /* The preview becomes a bottom sheet so the scene stays visible above it,
