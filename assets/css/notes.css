@@ -613,10 +613,17 @@ body.view-3d .toolbar,
   background: rgba(1, 3, 4, 0.82);
 }
 
-body.view-3d .timeline,
+/* In 3D the footer stays, as a strip along the bottom of the scene. */
 body.view-3d .site-footer,
-.waiting-for-scene .timeline,
 .waiting-for-scene .site-footer {
+  position: fixed;
+  z-index: 10;
+  inset: auto 0 0;
+  background: rgba(1, 3, 4, 0.82);
+}
+
+body.view-3d .timeline,
+.waiting-for-scene .timeline {
   position: absolute !important;
   width: 1px !important;
   height: 1px !important;
@@ -713,7 +720,7 @@ body:not(.view-3d) .preview {
   -webkit-backdrop-filter: blur(8px);
 }
 
-/* Over a cover, Share and Feed move to the bottom right corner of the band. */
+/* Over a cover, Share and RSS move to the bottom right corner of the band. */
 .page-header.has-cover .note-bar {
   display: contents;
 }
@@ -1098,7 +1105,7 @@ body:not(.view-3d) .preview {
     grid-template-columns: 1fr;
   }
 
-  /* Under the article the buttons wrap onto two rows. Share and Feed take
+  /* Under the article the buttons wrap onto two rows. Share and RSS take
      the first one, so they stay level with the pair above the article. */
   .note-footer .note-share {
     order: -1;
@@ -1106,11 +1113,12 @@ body:not(.view-3d) .preview {
     justify-content: flex-end;
   }
 
-  /* The preview becomes a bottom sheet so the scene stays visible above it. */
+  /* The preview becomes a bottom sheet so the scene stays visible above it,
+     sitting just above the footer strip. */
   .preview {
     top: auto;
     right: 0.75rem;
-    bottom: max(0.75rem, env(safe-area-inset-bottom));
+    bottom: calc(var(--footer-height, 0px) + 0.75rem);
     left: 0.75rem;
     width: auto;
     max-height: 46dvh;

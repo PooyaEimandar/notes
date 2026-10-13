@@ -103,6 +103,7 @@ const listSummary = element<HTMLElement>("list-summary");
 const listItems = element<HTMLElement>("list-items");
 const listMore = element<HTMLElement>("list-more");
 const toolbar = document.querySelector<HTMLElement>(".toolbar")!;
+const siteFooter = document.querySelector<HTMLElement>(".site-footer")!;
 
 const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
 const narrowScreen = window.matchMedia("(max-width: 620px)");
@@ -685,8 +686,12 @@ function updateInsets(): void {
     return;
   }
   const top = toolbar.getBoundingClientRect().bottom;
+  // The footer strip along the bottom of the scene; the phone preview sheet
+  // sits just above it.
+  const footer = view === "3d" ? siteFooter.getBoundingClientRect().height : 0;
+  root.style.setProperty("--footer-height", `${footer}px`);
   let right = 0;
-  let bottom = 0;
+  let bottom = footer;
   if (!preview.hidden && view === "3d") {
     const panel = preview.getBoundingClientRect();
     if (narrowScreen.matches) {
