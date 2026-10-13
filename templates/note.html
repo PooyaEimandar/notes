@@ -1,7 +1,9 @@
   <main id="content" class="page">
     <article class="page-inner" lang="{{ lang }}" data-pagefind-body
       data-pagefind-sort="date:{{ iso_date }}">
-      <header class="page-header">
+      <header class="page-header{{ cover_class }}">
+        {{ cover }}
+        <div class="page-header-text">
         <div class="note-bar" data-pagefind-ignore>
           <p class="eyebrow"><time datetime="{{ iso_date }}">{{ long_date }}</time></p>
           <div class="note-share">
@@ -14,6 +16,7 @@
         <ul class="page-meta" data-pagefind-ignore>
         {{ meta }}
         </ul>
+        </div>
       </header>
 
       <div class="prose"{{ direction }}>

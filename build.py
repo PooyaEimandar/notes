@@ -48,6 +48,12 @@ RTL_LANGUAGES = {"ar", "fa", "he", "ur"}
 NO_TAG = 0xFFFF
 MAX_TAGS_PER_NOTE = 5
 MAX_BRIDGES = 200
+# Covers are rendered at these widths (no wider than the original), in these
+# formats. Browsers take the first format they can show; every one can show
+# JPEG.
+COVER_WIDTHS = [480, 960, 1600]
+COVER_FORMATS = [("avif", "image/avif"), ("webp", "image/webp"), ("jpg", "image/jpeg")]
+COVER_SETTINGS = "v1 avif60 webp80 jpg82"
 SLUGS_PER_BUCKET = 256
 # Runs before the page is drawn. With WebGPU the list is hidden from the first
 # frame, so the scene is the first thing a visitor sees. Without it, or when
@@ -80,7 +86,27 @@ class Note:
     words: int = 0
     updated: dt.date | None = None
     asset_dir: Path | None = None
+    # The cover image. `image_source` is the file next to the note that the
+    # build renders in several sizes and formats; `image` is instead an
+    # address elsewhere, used as it is. `image_alt` stands in for either.
+    image: str = ""
+    image_source: Path | None = None
+    image_alt: str = ""
+    cover: "Cover | None" = None
     id: int = -1
+
+
+@dataclasses.dataclass
+class Cover:
+    """A cover rendered as `<address>-<width>.<format>` for every width and
+    format, with the picture's own proportions."""
+    address: str  # for example "hello/cover"
+    widths: list[int]
+    width: int
+    height: int
+
+    def file(self, width: int, extension: str) -> str:
+        return f"{self.address}-{width}.{extension}"
 
 
 # ---------------------------------------------------------------- utilities
@@ -391,6 +417,16 @@ def load_notes(site: "Site", content_dir: Path, cache_dir: Path, include_drafts:
             body_html=str(rendered["html"]), words=int(rendered["words"]),  # type: ignore[arg-type]
             asset_dir=path.parent if is_bundle else None,
         )
+        image = str(meta.get("image", "")).strip()
+        if image:
+            if re.match(r"^(https?:)?//|^/", image):
+                note.image = image
+            else:
+                # A file next to the note, published beside the note's page.
+                note.image_source = path.parent / image
+                if not note.image_source.is_file():
+                    raise BuildError(f"{source}: the image '{image}' is not next to the note")
+            note.image_alt = str(meta.get("image_alt", "")).strip()
         if "updated" in meta:
             note.updated = parse_date(meta["updated"], source, "updated")
         elif source in revised and revised[source] > date:
@@ -447,6 +483,48 @@ def load_palette() -> tuple[dict[str, str], str]:
     colours = {normalise_tag(name): lift(str(value), min_lightness)
                for name, value in raw.get("tags", {}).items()}
     return colours, default
+
+
+# -------------------------------------------------------------------- covers
+
+def render_cover(note: Note, cache_dir: Path, out: Path) -> Cover:
+    """Writes the note's cover in every width and format, from a cache keyed
+    on the picture's bytes so an unchanged picture is never encoded twice."""
+    from PIL import Image, ImageOps
+
+    source = note.image_source
+    assert source is not None
+    data = source.read_bytes()
+    digest = hashlib.sha256(f"{COVER_SETTINGS}\0".encode() + data).hexdigest()
+    cached = cache_dir / digest
+    manifest = cached / "cover.json"
+
+    if not manifest.exists():
+        cached.mkdir(parents=True, exist_ok=True)
+        try:
+            with Image.open(source) as opened:
+                picture = ImageOps.exif_transpose(opened) or opened
+                picture = picture.convert("RGB")
+        except Exception as error:  # Pillow raises many kinds
+            raise BuildError(f"{note.source}: the cover '{source.name}' cannot be read: {error}") from None
+        largest = min(picture.width, COVER_WIDTHS[-1])
+        widths = [width for width in COVER_WIDTHS if width < largest] + [largest]
+        for width in widths:
+            height = round(picture.height * width / picture.width)
+            sized = picture.resize((width, height), Image.Resampling.LANCZOS)
+            sized.save(cached / f"cover-{width}.avif", quality=60, speed=6)
+            sized.save(cached / f"cover-{width}.webp", quality=80, method=4)
+            sized.save(cached / f"cover-{width}.jpg", quality=82, optimize=True, progressive=True)
+        write(manifest, json.dumps({"widths": widths, "width": picture.width, "height": picture.height}))
+
+    info = json.loads(manifest.read_text(encoding="utf-8"))
+    cover = Cover(address=f"{note.slug}/cover", widths=info["widths"], width=info["width"], height=info["height"])
+    target = out / note.slug
+    target.mkdir(parents=True, exist_ok=True)
+    for width in cover.widths:
+        for extension, _ in COVER_FORMATS:
+            shutil.copy2(cached / f"cover-{width}.{extension}", target / f"cover-{width}.{extension}")
+    return cover
 
 
 # --------------------------------------------------------------------- scene
@@ -670,7 +748,8 @@ class Site:
 
     def page(self, *, path: str, title: str, description: str, body: str, body_class: str,
              og_type: str, json_ld: object, head_extra: str = "", scripts: str = "",
-             lang: str = "en", robots: str = "index, follow") -> None:
+             lang: str = "en", robots: str = "index, follow",
+             social_image: str = "", social_image_alt: str = "") -> None:
         canonical = self.url(path)
         context = {
             "lang": esc(lang),
@@ -681,7 +760,10 @@ class Site:
             "og_type": og_type,
             "site_title": esc(self.config["title"]),
             "canonical": esc(canonical),
-            "social_image": esc(self.config["social_image"]),
+            "social_image": esc(social_image or self.config["social_image"]),
+            "social_image_alt": esc(social_image_alt or self.config["author"]),
+            # A cover is wide; the fallback portrait is square.
+            "twitter_card": "summary_large_image" if social_image else "summary",
             "base": self.base,
             "build": self.build_id,
             "json_ld": json_for_script(json_ld),
@@ -703,17 +785,48 @@ class Site:
         return {"@type": "Person", "name": self.config["author"], "url": self.origin + "/",
                 "sameAs": self.config.get("same_as", [])}
 
+    def social_image(self, note: Note) -> str:
+        """The picture shown when the note is shared: the largest JPEG."""
+        if note.cover:
+            return self.url(note.cover.file(note.cover.widths[-1], "jpg"))
+        return note.image or str(self.config["social_image"])
+
+    def cover(self, note: Note, css_class: str, sizes: str, eager: bool = False) -> str:
+        """A <picture> of the cover, or nothing when the note has none."""
+        loading = ' fetchpriority="high"' if eager else ' loading="lazy" decoding="async"'
+        alt = f'alt="{esc(note.image_alt)}"'
+        if note.cover is None:
+            if not note.image:
+                return ""
+            return f'<img class="{css_class}" src="{esc(note.image)}" {alt}{loading}>'
+        cover = note.cover
+        sources = []
+        for extension, mime in COVER_FORMATS:
+            srcset = ", ".join(f"{self.href(cover.file(width, extension))} {width}w" for width in cover.widths)
+            if extension == "jpg":
+                sources.append(f'<img class="{css_class}" src="{self.href(cover.file(cover.widths[-1], "jpg"))}" '
+                               f'srcset="{srcset}" sizes="{sizes}" width="{cover.width}" height="{cover.height}" '
+                               f'{alt}{loading}>')
+            else:
+                sources.append(f'<source type="{mime}" srcset="{srcset}" sizes="{sizes}">')
+        return "<picture>" + "".join(sources) + "</picture>"
+
     def note_item(self, note: Note, heading: str = "h3") -> str:
         tags = "".join(f"<li>{self.tag_link(tag)}</li>" for tag in note.tags)
         tag_list = f'\n      <ul class="note-tags" aria-label="Tags">{tags}</ul>' if tags else ""
         # The browser works out the direction of each title and summary, so a
         # Persian note sits right to left among English ones.
         language = ' dir="auto"' + (f' lang="{esc(note.lang)}"' if note.lang != "en" else "")
+        summary = f"<p{language}>{esc(note.summary)}</p>"
+        if note.image or note.cover:
+            # The summary on the left, the cover on the right.
+            summary = (f'<div class="note-media">{summary}'
+                       f'{self.cover(note, "note-cover", "(max-width: 620px) calc(100vw - 2rem), 16rem")}</div>')
         return f"""  <article class="note-item" data-id="{note.id}">
     <time datetime="{note.date.isoformat()}">{short_date(note.date)}</time>
     <div>
       <{heading}{language}><a href="{self.href(f"{note.slug}/")}">{esc(note.title)}</a></{heading}>
-      <p{language}>{esc(note.summary)}</p>{tag_list}
+      {summary}{tag_list}
       <div class="note-actions">
         <a class="btn" href="{self.href(f"{note.slug}/")}" aria-label="Read more: {esc(note.title)}">Read more</a>
         <button class="btn" type="button" data-locate="{note.id}" hidden>Locate in 3D</button>
@@ -767,6 +880,12 @@ def build_index(site: Site, notes: list[Note], tags: list[dict[str, object]]) ->
               head_extra=WAIT_FOR_SCENE)
 
 
+def build_covers(site: Site, notes: list[Note]) -> None:
+    for note in notes:
+        if note.image_source is not None:
+            note.cover = render_cover(note, ROOT / ".cache" / "covers", site.out)
+
+
 def build_notes(site: Site, notes: list[Note]) -> None:
     config = site.config
     for position, note in enumerate(notes):
@@ -803,6 +922,8 @@ def build_notes(site: Site, notes: list[Note]) -> None:
             "meta": "\n        ".join(meta),
             "content": note.body_html,
             "history": esc(history),
+            "cover": site.cover(note, "page-cover", "100vw", eager=True),
+            "cover_class": " has-cover" if note.image or note.cover else "",
             "footer_tags": "".join(site.tag_link(tag) for tag in note.tags),
             "author": esc(config["author"]),
             "origin": esc(site.origin),
@@ -823,7 +944,7 @@ def build_notes(site: Site, notes: list[Note]) -> None:
             "inLanguage": note.lang,
             "keywords": note.tags,
             "wordCount": note.words,
-            "image": config["social_image"],
+            "image": site.social_image(note),
             "copyrightYear": note.date.year,
             "copyrightHolder": site.person(),
             "author": site.person(),
@@ -837,6 +958,8 @@ def build_notes(site: Site, notes: list[Note]) -> None:
         site.page(path=f"{note.slug}/", title=f"{note.title} | {config['title']}", description=note.summary,
                   body=body, body_class="page-note", og_type="article", json_ld=json_ld,
                   head_extra="\n  ".join(head), lang=note.lang,
+                  social_image=site.social_image(note) if note.image or note.cover else "",
+                  social_image_alt=note.image_alt or note.title,
                   scripts=f'<script type="module" src="{site.base}assets/js/note.js?v={site.build_id}"></script>')
 
         if note.asset_dir is not None:
@@ -892,9 +1015,15 @@ def build_data(site: Site, notes: list[Note], tags: list[dict[str, object]]) -> 
     tag_index = {tag["name"]: i for i, tag in enumerate(tags)}
     data = site.out / "data"
     for start in range(0, len(notes), chunk):
-        # The language is listed only for notes that are not in English.
-        rows = [[n.slug, n.title, n.date.isoformat(), [tag_index[t] for t in n.tags], n.summary]
-                + ([n.lang] if n.lang != "en" else [])
+        # The cover is [address, widths, width, height] for a rendered one, a
+        # bare address for a picture elsewhere, and an empty string for none.
+        def cover_row(n: Note) -> object:
+            if n.cover:
+                return [site.href(n.cover.address), n.cover.widths, n.cover.width, n.cover.height]
+            return n.image
+
+        rows = [[n.slug, n.title, n.date.isoformat(), [tag_index[t] for t in n.tags], n.summary, n.lang,
+                 cover_row(n), n.image_alt]
                 for n in notes[start:start + chunk]]
         write(data / "notes" / f"{start // chunk}.json", json.dumps(rows, ensure_ascii=False, separators=(",", ":")))
     # A link to a note in the scene names the note by its address, which never
@@ -1075,6 +1204,7 @@ def command_build(args: argparse.Namespace) -> None:
         raise BuildError("there are too many different tags")
 
     log(f"Writing {len(notes)} notes and {len(tags)} tags")
+    build_covers(site, notes)
     build_index(site, notes, tags)
     build_notes(site, notes)
     build_tag_pages(site, notes, tags)

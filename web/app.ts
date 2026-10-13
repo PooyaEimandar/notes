@@ -20,11 +20,15 @@ interface Manifest {
   tags: TagInfo[];
 }
 
+/** A cover the build rendered: address prefix, widths, and the original size. */
+type RenderedCover = [string, number[], number, number];
+
 /**
- * One row of data/notes/<chunk>.json: slug, title, date, tags, summary, and
- * the language when it is not English.
+ * One row of data/notes/<chunk>.json: slug, title, date, tags, summary,
+ * language, cover, and the cover's alt text. The cover is a RenderedCover, the
+ * address of a picture elsewhere, or an empty string for none.
  */
-type NoteRow = [string, string, string, number[], string, string?];
+type NoteRow = [string, string, string, number[], string, string, RenderedCover | string, string];
 
 interface Note {
   id: number;
@@ -34,6 +38,8 @@ interface Note {
   tags: number[];
   summary: string;
   lang: string;
+  cover: RenderedCover | string;
+  coverAlt: string;
 }
 
 interface SceneBindings {
@@ -139,14 +145,16 @@ function loadChunk(chunk: number): Promise<Note[]> {
   let pending = chunks.get(chunk);
   if (!pending) {
     pending = fetchJson<NoteRow[]>(`data/notes/${chunk}.json`).then((rows) =>
-      rows.map(([slug, title, date, tags, summary, lang], offset) => ({
+      rows.map(([slug, title, date, tags, summary, lang, cover, coverAlt], offset) => ({
         id: chunk * manifest.chunk + offset,
         slug,
         title,
         date,
         tags,
         summary,
-        lang: lang ?? "en",
+        lang,
+        cover,
+        coverAlt,
       })),
     );
     pending.catch(() => chunks.delete(chunk));
@@ -400,6 +408,41 @@ function inItsLanguage<T extends HTMLElement>(target: T, note: Note): T {
   return target;
 }
 
+const COVER_FORMATS: [string, string][] = [["avif", "image/avif"], ["webp", "image/webp"]];
+
+/** The note's cover as the build.py `cover` function writes it, or null. */
+function cover(note: Note, className: string, sizes: string): HTMLElement | null {
+  if (!note.cover) {
+    return null;
+  }
+  const image = document.createElement("img");
+  image.className = className;
+  image.alt = note.coverAlt;
+  image.loading = "lazy";
+  image.decoding = "async";
+  if (typeof note.cover === "string") {
+    image.src = note.cover;
+    return image;
+  }
+  const [address, widths, width, height] = note.cover;
+  const srcset = (extension: string) => widths.map((w) => `${address}-${w}.${extension} ${w}w`).join(", ");
+  const picture = document.createElement("picture");
+  for (const [extension, type] of COVER_FORMATS) {
+    const source = document.createElement("source");
+    source.type = type;
+    source.srcset = srcset(extension);
+    source.sizes = sizes;
+    picture.append(source);
+  }
+  image.src = `${address}-${widths[widths.length - 1]}.jpg`;
+  image.srcset = srcset("jpg");
+  image.sizes = sizes;
+  image.width = width;
+  image.height = height;
+  picture.append(image);
+  return picture;
+}
+
 function shortDate(date: string): string {
   const [, month, day] = date.split("-").map(Number);
   return `${MONTHS[(month ?? 1) - 1]!.slice(0, 3)} ${day}`;
@@ -454,7 +497,17 @@ function noteItem(note: Note): HTMLElement {
   actions.append(read, locate);
 
   const body = document.createElement("div");
-  body.append(heading, summary);
+  body.append(heading);
+  const picture = cover(note, "note-cover", "(max-width: 620px) calc(100vw - 2rem), 16rem");
+  if (picture) {
+    // The summary on the left, the cover on the right.
+    const media = document.createElement("div");
+    media.className = "note-media";
+    media.append(summary, picture);
+    body.append(media);
+  } else {
+    body.append(summary);
+  }
   const tags = tagList(note);
   if (tags) {
     body.append(tags);
@@ -609,7 +662,12 @@ async function openPreview(id: number): Promise<void> {
   actions.append(read, close);
 
   preview.textContent = "";
-  preview.append(eyebrow, heading, summary);
+  preview.append(eyebrow, heading);
+  const picture = cover(note, "note-cover", "22rem");
+  if (picture) {
+    preview.append(picture);
+  }
+  preview.append(summary);
   const tags = tagList(note);
   if (tags) {
     preview.append(tags);
