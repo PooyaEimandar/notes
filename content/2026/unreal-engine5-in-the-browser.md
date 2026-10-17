@@ -29,7 +29,7 @@ Development and build validation are currently on macOS, with Windows and Linux 
 
 I hope Epic eventually brings back official support for running Unreal games in the browser. The move away from official HTML5 support was announced with [Unreal Engine 4.23](https://www.unrealengine.com/blog/unreal-engine-4-23-released?lang=en-US), and HTML5 became a [community-supported platform extension in 4.24](https://github.com/UnrealEngineHTML5/Documentation/blob/master/Platforms/HTML5/HowTo/README.1.emscripten.UE4.HTML5.md). I can understand the decision, given the constraints of the WebGL-based browser path at the time. Still, I hope Epic gives the web another chance with WebGPU, and that work like this eventually becomes part of an official release maintained by Unreal's development team.
 
-You can watch the [browser demo](https://youtu.be/AyVYaKl-kJY?si=t6LkXTmN5Y5jSwSM) below; [another demo](https://youtu.be/L_vMWwC1AtU?si=1Zs58yMw7Vdu8e2B) is also on YouTube. The build guide and source-access instructions are in [UnrealEngine-WebGPU on GitHub](https://github.com/PooyaEimandar/UnrealEngine-WebGPU).
+You can watch the [browser demo](https://youtu.be/AyVYaKl-kJY?si=t6LkXTmN5Y5jSwSM) on YouTube. The build guide and source-access instructions are in [UnrealEngine-WebGPU on GitHub](https://github.com/PooyaEimandar/UnrealEngine-WebGPU).
 
 <div class="video">
 <iframe width="560" height="315" src="https://www.youtube.com/embed/AyVYaKl-kJY" title="Unreal Engine 5.8.3 in Your Browser! | WebGPU + WebAssembly Demo" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen loading="lazy"></iframe>
