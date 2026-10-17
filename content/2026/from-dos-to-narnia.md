@@ -2,7 +2,7 @@
 title: From DOS to Narnia
 date: 2026-10-05
 tags: [personal]
-image: dos.jpg
+image: asset/dos.jpg
 image_alt: The Award BIOS boot screen of a 486 PC, with the Energy Star logo.
 summary: I started learning about computers with DOS, at a time when PCs could be found in only a handful of training centers in Tehran.
 ---

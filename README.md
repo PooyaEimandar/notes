@@ -34,8 +34,9 @@ The note, in Markdown.
 | `image`   | no       | The cover: a file next to the note, which the build renders as WebP and JPEG at several widths, or an address on another site, where the build uses the `.webp` and `.jpg` that exist beside it. |
 | `image_alt` | no     | What the cover shows, for readers who cannot see it.                 |
 
-A note that needs images can be a folder: `content/2026/my-note/index.md`, with
-the images next to it. To link to another note, link to its Markdown file, for
+Pictures live in `content/<year>/asset/` and are named relative to the note,
+for example `image: asset/dos.jpg`. A note with many pictures can also be a
+folder, `content/2026/my-note/index.md`, with the pictures next to it. To link to another note, link to its Markdown file, for
 example `[hello](../2026/hello.md)`. The two notes are then joined in the scene.
 
 ## Colours
