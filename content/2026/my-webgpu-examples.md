@@ -1,7 +1,7 @@
 ---
 title: My WebGPU examples
 date: 2026-10-13
-tags: [webgpu, graphics, rust]
+tags: [webgpu, graphics, rust, wasm]
 image: https://pooya.ai/webgpu/screenshots/residentevil2.jpg
 image_alt: Claire Redfield standing in the rain outside the R.P.D. gate, rendered in WebGPU with fixed cameras.
 summary: WebGPU has arrived in the browser. Here is why I think it matters, and the examples I built by porting Sascha Willems' Vulkan samples to Rust and WGPU.
