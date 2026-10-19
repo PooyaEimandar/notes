@@ -2,10 +2,25 @@
 title: Bringing Unreal Engine 5.8 to the browser
 date: 2026-10-17
 tags: [webgpu, unreal-engine, cpp, wasm]
-image: asset/unreal-engine-webgpu-thumbnail.jpg
+image: asset/unreal-engine-webgpu.jpg
 image_alt: The Unreal Engine logo, a red heart, and the WebGPU logo on a dark blue background.
 summary: From a native WebGPU renderer to packaging an Unreal Engine game for the browser, a few things I learned while building UnrealEngine-WebGPU.
 ---
+
+Ten years of building [PlayPod](https://PlayPod.ir), our cloud gaming platform, have shown me how much of the gaming community the industry leaves behind: gamers who cannot afford to buy or continually upgrade gaming hardware, including smartphones.
+
+At the other end of the market, devices such as [Meta’s Ray-Ban smart glasses](https://youtu.be/gZ9IsB72nVk?si=JRqCKQMyZrJs8IFG) highlight a different constraint. Even people who can afford advanced, premium technology use small devices with limited storage, processing power and battery life. Downloading games that occupy tens of gigabytes and running demanding graphics locally is difficult on such hardware. Streaming has an important role to play here.
+
+Cloud gaming, however, is expensive to operate. Consider an $90K server accommodating up to ten GPUs. Depending on the game, resolution and performance target, even effective GPU partitioning might leave that machine serving only around 32 to 64 concurrent players. Hardware, power, cooling and bandwidth make the economics challenging.
+
+This is where I see an opportunity for a hybrid approach: combining local execution with cloud services where they are needed. WebGPU could help make that practical by allowing compatible devices to handle rendering locally, while servers provide multiplayer and other shared services. More demanding experiences could still use cloud rendering.
+
+The experience I want to build is as accessible as cloud gaming: open a link and start playing in your browser. By making better use of the hardware players already have, we could bring that experience to more people at a lower operating cost.
+
+<div class="video">
+<iframe width="560" height="315" src="https://www.youtube.com/embed/AyVYaKl-kJY" title="Unreal Engine 5.8.3 in Your Browser! | WebGPU + WebAssembly Demo" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen loading="lazy"></iframe>
+</div>
+
 
 After building my [WebGPU examples](my-webgpu-examples.md), I wanted to take the next step: bring a complete game engine into the browser. That became UnrealEngine-WebGPU, my fork of Unreal Engine 5.8.3 with a WebGPU renderer and an HTML5 platform target.
 
@@ -29,8 +44,4 @@ Development and build validation are currently on macOS, with Windows and Linux 
 
 I hope Epic eventually brings back official support for running Unreal games in the browser. The move away from official HTML5 support was announced with [Unreal Engine 4.23](https://www.unrealengine.com/blog/unreal-engine-4-23-released?lang=en-US), and HTML5 became a [community-supported platform extension in 4.24](https://github.com/UnrealEngineHTML5/Documentation/blob/master/Platforms/HTML5/HowTo/README.1.emscripten.UE4.HTML5.md). I can understand the decision, given the constraints of the WebGL-based browser path at the time. Still, I hope Epic gives the web another chance with WebGPU, and that work like this eventually becomes part of an official release maintained by Unreal's development team.
 
-You can watch the [browser demo](https://youtu.be/AyVYaKl-kJY?si=t6LkXTmN5Y5jSwSM) on YouTube. The build guide and source-access instructions are in [UnrealEngine-WebGPU on GitHub](https://github.com/PooyaEimandar/UnrealEngine-WebGPU).
-
-<div class="video">
-<iframe width="560" height="315" src="https://www.youtube.com/embed/AyVYaKl-kJY" title="Unreal Engine 5.8.3 in Your Browser! | WebGPU + WebAssembly Demo" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen loading="lazy"></iframe>
-</div>
+The build guide and source-access instructions are in [UnrealEngine-WebGPU on GitHub](https://github.com/PooyaEimandar/UnrealEngine-WebGPU).
