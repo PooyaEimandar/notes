@@ -1129,15 +1129,26 @@ body:not(.view-3d) .preview {
     margin-left: 0;
   }
 
-  /* Over a cover, a phone has no room for the tags and the buttons side by
-     side: the buttons take their own row, and the band is half the cover
-     rather than a third, so the picture is not cropped away. */
+  /* A phone is too narrow to lay the header over a wide cover: the picture
+     would be cropped to a tall strip. The cover keeps its own proportions
+     at full width, and the header sits beneath it on the same band. */
   .page-header.has-cover {
-    grid-template-rows: 1fr 1fr;
+    display: block;
+    min-height: 0;
+  }
+
+  .page-header.has-cover picture,
+  .page-header.has-cover .page-cover {
+    position: static;
+    display: block;
+    width: 100%;
+    height: auto;
   }
 
   .page-header.has-cover .page-header-text {
     grid-template-columns: minmax(0, 1fr);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
     grid-template-areas:
       "date"
       "title"
