@@ -1,10 +1,10 @@
 ---
-title: Unreal Engine 5, WebGPU and multiplayer across native and browser
+title: Unreal Engine 5, WebGPU and multiplayer
 date: 2026-10-19
 tags: [webgpu, unreal-engine, rust, cpp, wasm]
 image: asset/unreal-engine-webgpu-networking.jpg
 image_alt: Several Unreal Engine Third Person clients sharing a multiplayer scene, with Unreal Engine, heart, WebGPU and networking graphics.
-summary: Connecting browser players to Unreal's native multiplayer server through a Rust gateway, and what reconnects, the Third Person template and memory profiling taught me along the way.
+summary: Connecting browser players to Unreal's native multiplayer server through a Rust gateway.
 ---
 
 After [bringing Unreal Engine to the browser](unreal-engine5-in-the-browser.md), I had two approaches to consider for multiplayer. I could implement WebSocket and WebTransport server support inside Unreal's C++ environment, through a plugin or changes to the fork. Alternatively, I could build a separate gateway that maps browser WebSocket and WebTransport connections onto Unreal's existing UDP networking. Browser JavaScript and WebAssembly cannot open raw UDP sockets, so either approach needed to bridge that gap.
