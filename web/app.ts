@@ -2,7 +2,7 @@
 // the WebGPU scene (src/lib.rs). The list works on its own; the scene is added
 // when the browser supports WebGPU.
 
-export {};
+export { };
 
 interface TagInfo {
   name: string;
@@ -995,6 +995,19 @@ function listen(): void {
   });
 
   reducedMotion.addEventListener("change", () => scene?.set_reduced_motion(reducedMotion.matches));
+
+  window.addEventListener("pageshow", (event) => {
+    if (event.persisted && scene) {
+      location.reload();
+    }
+  });
+  window.addEventListener("notes:lost", () => {
+    if (document.visibilityState === "visible") {
+      location.reload();
+    } else {
+      document.addEventListener("visibilitychange", () => location.reload(), { once: true });
+    }
+  });
 }
 
 async function start(): Promise<void> {

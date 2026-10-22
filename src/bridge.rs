@@ -6,6 +6,7 @@
 //! - `notes:scene`   the scene file was loaded; the detail is the note count
 //! - `notes:select`  a note was selected; -1 when the selection was cleared
 //! - `notes:hover`   the pointer is over a note; -1 when it is over none
+//! - `notes:lost`    the browser took the GPU device away; the scene is gone
 
 use sib::render::RenderContext;
 

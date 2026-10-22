@@ -503,6 +503,10 @@ impl Example for Notes {
         self.gpu = Some(Gpu::new(context));
         self.frame(context);
         self.orbit.settle();
+        context.device.set_device_lost_callback(|reason, message| {
+            bridge::report(&format!("The GPU device was lost ({reason:?}): {message}"));
+            bridge::emit("notes:lost", 0.0);
+        });
         bridge::emit("notes:ready", 0.0);
         Ok(())
     }
