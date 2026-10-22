@@ -1,7 +1,11 @@
 # Site settings read by build.py.
 
 title = "Pooya's Notes"
-description = "Notes by Pooya Eimandar"
+# The notes page's <title>; the heading on the page stays `title`.
+index_title = "Notes by Pooya Eimandar: Rust, WebGPU and Game Engines"
+description = "Notes by Pooya Eimandar on Rust, WebGPU, Unreal Engine, game engines, and a life in technology, from DOS in Tehran to the browser."
+# The name search engines and link previews show for every page on pooya.ai.
+site_name = "Pooya Eimandar"
 author = "Pooya Eimandar"
 email = "mail@pooya.ai"
 wordmark = "Stay Hungry, Stay Foolish"
@@ -14,7 +18,9 @@ base_path = "/notes/"
 repository = "https://github.com/PooyaEimandar/notes"
 branch = "main"
 
-social_image = "https://github.com/PooyaEimandar.png?size=512"
+# Shown when a page without a cover of its own is shared: a 1200x630 card that
+# the personal-site repository publishes.
+social_image = "https://pooya.ai/assets/images/social.png"
 same_as = [
   "https://github.com/PooyaEimandar",
   "https://www.youtube.com/channel/UC5XZoDB5YHd07WSWeMAYyZQ",
@@ -25,6 +31,9 @@ chunk_size = 64
 feed_size = 30
 # Tags shown in the filter bar, most used first.
 tag_bar_size = 24
+# A tag page lists notes found elsewhere, so search engines skip it, and the
+# sitemap leaves it out, until the tag has at least this many notes.
+tag_index_min_notes = 5
 
 [[nav]]
 label = "Home"

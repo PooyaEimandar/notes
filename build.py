@@ -817,11 +817,12 @@ class Site:
             "robots": robots,
             "og_type": og_type,
             "site_title": esc(self.config["title"]),
+            "site_name": esc(self.config.get("site_name", self.config["title"])),
             "canonical": esc(canonical),
             "social_image": esc(social_image or self.config["social_image"]),
             "social_image_alt": esc(social_image_alt or self.config["author"]),
-            # A cover is wide; the fallback portrait is square.
-            "twitter_card": "summary_large_image" if social_image else "summary",
+            # Covers and the fallback card are both wide.
+            "twitter_card": "summary_large_image",
             "base": self.base,
             "build": self.build_id,
             "json_ld": json_for_script(json_ld),
@@ -840,8 +841,13 @@ class Site:
         write(target, render_template("base.html", context))
 
     def person(self) -> dict[str, object]:
-        return {"@type": "Person", "name": self.config["author"], "url": self.origin + "/",
-                "sameAs": self.config.get("same_as", [])}
+        # The @id is the one the home page defines, so every page names the
+        # same person.
+        return {"@type": "Person", "@id": self.origin + "/#person", "name": self.config["author"],
+                "url": self.origin + "/", "sameAs": self.config.get("same_as", [])}
+
+    def tag_is_indexed(self, tag: dict[str, object]) -> bool:
+        return int(tag["count"]) >= int(self.config.get("tag_index_min_notes", 1))  # type: ignore[call-overload]
 
     def cover_href(self, cover: Cover, width: int, extension: str) -> str:
         """The address of one file of a cover, on this site or another."""
@@ -939,6 +945,7 @@ def build_index(site: Site, notes: list[Note], tags: list[dict[str, object]]) ->
         "description": config["description"],
         "url": site.url(),
         "inLanguage": "en",
+        "isPartOf": {"@id": site.origin + "/#website"},
         "author": site.person(),
         "blogPost": [{"@type": "BlogPosting", "headline": n.title, "url": site.url(f"{n.slug}/"),
                       "datePublished": n.date.isoformat()} for n in newest[:20]],
@@ -946,7 +953,8 @@ def build_index(site: Site, notes: list[Note], tags: list[dict[str, object]]) ->
     # If the script cannot be loaded, nothing would ever show the list again.
     scripts = (f'<script type="module" src="{site.base}assets/js/app.js?v={site.build_id}" '
                f'onerror="document.documentElement.classList.remove(\'waiting-for-scene\')"></script>')
-    site.page(path="", title=str(config["title"]), description=str(config["description"]), body=body,
+    site.page(path="", title=str(config.get("index_title", config["title"])),
+              description=str(config["description"]), body=body,
               body_class="page-index view-list", og_type="website", json_ld=json_ld, scripts=scripts,
               head_extra=WAIT_FOR_SCENE)
 
@@ -1071,8 +1079,9 @@ def build_tag_pages(site: Site, notes: list[Note], tags: list[dict[str, object]]
             "url": site.url(f"tags/{name}/"),
             "isPartOf": {"@type": "Blog", "name": config["title"], "url": site.url()},
         }
+        robots = "index, follow" if site.tag_is_indexed(tag) else "noindex, follow"
         site.page(path=f"tags/{name}/", title=f"#{name} | {config['title']}", description=description,
-                  body=body, body_class="page-tag", og_type="website", json_ld=json_ld)
+                  body=body, body_class="page-tag", og_type="website", json_ld=json_ld, robots=robots)
 
 
 def build_not_found(site: Site) -> None:
@@ -1164,7 +1173,7 @@ def build_sitemap(site: Site, notes: list[Note], tags: list[dict[str, object]]) 
     newest = max((n.updated or n.date for n in notes), default=dt.date.today())
     rows = [(site.url(), newest)]
     rows += [(site.url(f"{n.slug}/"), n.updated or n.date) for n in reversed(notes)]
-    for tag in tags:
+    for tag in filter(site.tag_is_indexed, tags):
         dates = [n.updated or n.date for n in notes if tag["name"] in n.tags]
         rows.append((site.url(f"tags/{tag['name']}/"), max(dates)))
     body = "\n".join(f"  <url>\n    <loc>{esc(loc)}</loc>\n    <lastmod>{date.isoformat()}</lastmod>\n  </url>"
