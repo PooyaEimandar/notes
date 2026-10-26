@@ -7,7 +7,7 @@ image_alt: The Unreal Engine logo, a red heart, and the WebGPU logo on a dark bl
 summary: From a native WebGPU renderer to packaging an Unreal Engine game for the browser, a few things I learned while building UnrealEngine-WebGPU.
 ---
 
-Ten years of building [PlayPod](https://PlayPod.ir), our cloud gaming platform, have shown me how much of the gaming community the industry leaves behind: gamers who cannot afford to buy or continually upgrade gaming hardware, including smartphones.
+Ten years of building [PlayPod](https://playpod.ir), our cloud gaming platform, have shown me how much of the gaming community the industry leaves behind: gamers who cannot afford to buy or continually upgrade gaming hardware, including smartphones.
 
 At the other end of the market, devices such as [Meta’s Ray-Ban smart glasses](https://youtu.be/gZ9IsB72nVk?si=JRqCKQMyZrJs8IFG) highlight a different constraint. Even people who can afford advanced, premium technology use small devices with limited storage, processing power and battery life. Downloading games that occupy tens of gigabytes and running demanding graphics locally is difficult on such hardware. Streaming has an important role to play here.
 
