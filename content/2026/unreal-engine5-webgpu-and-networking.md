@@ -27,3 +27,4 @@ For the visible demo, I copied Epic's official Third Person template and kept it
 
 There is more work before I can call this production-ready. Synthetic gateway load tests exposed loss and long delays under pressure; they cannot establish how many players a real Unreal world can support. My preferred next step is to host a multiplayer game on a website and test it with real players, across different devices and network conditions.
 
+The build guide and source-access instructions are in [UnrealEngine-WebGPU on GitHub](https://github.com/PooyaEimandar/UnrealEngine-WebGPU).
