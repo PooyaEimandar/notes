@@ -1,4 +1,5 @@
 ---
+draft: true
 title: Unreal Engine 5, WebGPU and multiplayer
 date: 2026-10-19
 tags: [webgpu, unreal-engine, rust, cpp, wasm]
