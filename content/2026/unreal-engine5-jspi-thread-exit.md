@@ -2,6 +2,8 @@
 title: When Emscripten exits a thread that is still running
 date: 2026-11-04
 tags: [unreal-engine, wasm, cpp, webgpu]
+image: asset/unreal-engine5-jspi-thread-exit.jpg
+image_alt: The Future Museum Dubai inside UE5 via WebGPU.
 summary: My Unreal Engine browser build ran in Chrome but stopped in Safari with a ToBigInt error. The game thread was being exited while JSPI had suspended its main().
 ---
 
