@@ -3,6 +3,13 @@
 //! `web/app.ts` loads this module, hands it `data/scene.bin`, and drives it
 //! through the functions exported below.
 
+// Runtime code must not panic on unwrap, expect or assert (see [lints.clippy]
+// in Cargo.toml); unit tests may. The non-test build still checks everything else.
+#![cfg_attr(
+    test,
+    allow(clippy::unwrap_used, clippy::expect_used, clippy::disallowed_macros)
+)]
+
 pub mod app;
 pub mod bridge;
 pub mod data;

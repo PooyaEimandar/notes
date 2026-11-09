@@ -37,6 +37,13 @@ web-sys = { version = "=0.3.106", features = [
     "console",
 ] }
 
+# Runtime code must not panic on unwrap, expect or assert; src/lib.rs exempts
+# the unit tests. The banned macros are listed in clippy.toml.
+[lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"
+disallowed_macros = "deny"
+
 [profile.release]
 codegen-units = 1
 lto = "fat"

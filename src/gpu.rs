@@ -1,29 +1,37 @@
 //! Pipelines and buffers. Notes, stars and links are each one instanced draw.
 
-use bytemuck::{Pod, Zeroable};
 use sib::render::{RenderContext, bind_group, buffer, render_pass, shader, wgpu};
 
-#[repr(C)]
-#[derive(Clone, Copy, Debug, Default, Pod, Zeroable)]
-pub struct Globals {
-    pub view_projection: [[f32; 4]; 4],
-    pub viewport: [f32; 4],
-    pub time: [f32; 4],
-    pub lens: [f32; 4],
-    pub floor: [f32; 4],
-    pub grid: [f32; 4],
-    pub accent: [f32; 4],
-    pub centroid: [f32; 4],
-    pub detail: [f32; 4],
-}
+pub use layout::{Globals, Instance};
 
-/// Three vectors per instance. `scene.wgsl` says what each one holds.
-#[repr(C)]
-#[derive(Clone, Copy, Debug, Default, Pod, Zeroable)]
-pub struct Instance {
-    pub a: [f32; 4],
-    pub b: [f32; 4],
-    pub c: [f32; 4],
+// bytemuck's derive checks the layout with compile-time asserts. Allow them
+// in this module only; the rest of the file stays under the assert ban.
+#[allow(clippy::disallowed_macros)]
+mod layout {
+    use bytemuck::{Pod, Zeroable};
+
+    #[repr(C)]
+    #[derive(Clone, Copy, Debug, Default, Pod, Zeroable)]
+    pub struct Globals {
+        pub view_projection: [[f32; 4]; 4],
+        pub viewport: [f32; 4],
+        pub time: [f32; 4],
+        pub lens: [f32; 4],
+        pub floor: [f32; 4],
+        pub grid: [f32; 4],
+        pub accent: [f32; 4],
+        pub centroid: [f32; 4],
+        pub detail: [f32; 4],
+    }
+
+    /// Three vectors per instance. `scene.wgsl` says what each one holds.
+    #[repr(C)]
+    #[derive(Clone, Copy, Debug, Default, Pod, Zeroable)]
+    pub struct Instance {
+        pub a: [f32; 4],
+        pub b: [f32; 4],
+        pub c: [f32; 4],
+    }
 }
 
 impl Instance {

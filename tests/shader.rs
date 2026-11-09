@@ -1,5 +1,8 @@
 //! The shader is compiled by the browser at run time, so check it here first.
 
+// A test may panic; see [lints.clippy] in Cargo.toml.
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::disallowed_macros)]
+
 use naga::valid::{Capabilities, ValidationFlags, Validator};
 
 #[test]
