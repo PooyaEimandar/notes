@@ -112,7 +112,7 @@ Each platform had its own problem:
 
 The wallet's Wasm is built twice in isolated runs and compared byte for byte before a release may use it, and so is the Worker's artifact. This exposed a platform difference: Cargo includes the compiler's host triple in crate disambiguators, so my Mac's build did not match CI's. Releases are now built and sealed inside a pinned Linux image.
 
-For next and production, a separate signature binds wallet permissions to the exact commit, browser/Wasm and Worker artifacts, configuration and lane. GitHub verifies the artifact on a fresh runner without deployment credentials, stages it at 0% traffic, and checks the served bytes before promotion. A reproducible build still needs permission to become the release.
+For release candidate and production, a separate signature binds wallet permissions to the exact commit, browser/Wasm and Worker artifacts, configuration and lane. GitHub verifies the artifact on a fresh runner without deployment credentials, stages it at 0% traffic, and checks the served bytes before promotion. A reproducible build still needs permission to become the release.
 
 CI time needed a fix as well. The vault's scrypt is slow on purpose, and at `opt-level = 0` it is far slower. The wallet tests took about 56 CPU-minutes, more than a two-vCPU CI host could finish within its 30-minute limit. Optimizing only `scrypt` and `salsa20` in the test profile brought the suite below two minutes, while keeping debug assertions and overflow checks on.
 
