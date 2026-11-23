@@ -48,14 +48,6 @@ label = "Notes"
 href = "/notes/"
 
 [[nav]]
-label = "GitHub"
-href = "https://github.com/PooyaEimandar"
-
-[[nav]]
-label = "YouTube"
-href = "https://www.youtube.com/channel/UC5XZoDB5YHd07WSWeMAYyZQ"
-
-[[nav]]
 label = "Sponsor"
 href = "https://github.com/sponsors/PooyaEimandar"
 
