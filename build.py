@@ -801,7 +801,8 @@ class Site:
             external = re.match(r"^https?://", href) is not None
             current = ' aria-current="page"' if href.rstrip("/") == self.base.rstrip("/") else ""
             target = ' target="_blank" rel="noopener noreferrer"' if external else ""
-            items.append(f'      <a href="{esc(href)}"{current}{target}>{esc(entry["label"])}</a>')
+            download = " download" if entry.get("download") else ""
+            items.append(f'      <a href="{esc(href)}"{current}{target}{download}>{esc(entry["label"])}</a>')
         return "\n".join(items)
 
     def page(self, *, path: str, title: str, description: str, body: str, body_class: str,

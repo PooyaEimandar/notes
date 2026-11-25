@@ -52,6 +52,11 @@ label = "Sponsor"
 href = "https://github.com/sponsors/PooyaEimandar"
 
 [[nav]]
+label = "CV"
+href = "/Pooya_Eimandar_CV.pdf"
+download = true
+
+[[nav]]
 label = "Contact"
 href = "mailto:mail@pooya.ai"
 
